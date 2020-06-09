@@ -14,11 +14,17 @@ Written by Evgeniy Ryzhkov
 Usage:
 
     # parse data
-    parse data: python -m scripts.data.py --op=parse_data --fo=update --region=[reiong name from dictionary]
+    parse data: python -m scripts.data.py --op=parse_data --city_dir=[dir_name_inside_data_dir]
 
 """
 
 import argparse
+import requests
+from lxml import html
+import os
+import pandas as pd
+import glob
+
 
 
 class Data:
@@ -28,17 +34,164 @@ class Data:
 
         # run parsing data
         if args['op'] == 'parse_data':
-            self._parse_data(args['region'])
+            city_data = self._load_csv_data(args['city_dir'])
 
-    # parsing data from zillow
-    def _parse_data(self, region):
+            self._familiarity_with_data(city_data)
+            prepared_data = self._prepare_data(city_data)
+            self._familiarity_with_data(prepared_data)
+
+    def _load_csv_data(self, city_dir):
         print('[INFO] Parsing started...')
+        DATA_DIR = 'data/'
 
-        # regiong urls dictionary
-        REGION_URLS = {
-            'seattle': 'https://www.zillow.com/homes/for_sale/house_type/?searchQueryState=%7B%22pagination%22%3A%7B%7D%2C%22usersSearchTerm%22%3A%22Seattle%2C%20WA%22%2C%22mapBounds%22%3A%7B%22west%22%3A-124.63987601213681%2C%22east%22%3A-119.66856253557431%2C%22south%22%3A46.58769550209506%2C%22north%22%3A48.79469225492623%7D%2C%22isMapVisible%22%3Atrue%2C%22mapZoom%22%3A9%2C%22filterState%22%3A%7B%22con%22%3A%7B%22value%22%3Afalse%7D%2C%22sort%22%3A%7B%22value%22%3A%22globalrelevanceex%22%7D%2C%22land%22%3A%7B%22value%22%3Afalse%7D%2C%22manu%22%3A%7B%22value%22%3Afalse%7D%7D%2C%22isListVisible%22%3Atrue%2C%22customRegionId%22%3A%22a6a2d5ece6X1-CRocj8je9hqnwe_ygbrk%22%7D'
-        }
-        zillow_url = REGION_URLS[region]
+        # csv files with city data consist of many separate files
+        all_files = glob.glob(os.path.join(DATA_DIR + city_dir + "/*.csv"))
+        print('files=', len(all_files))
+        li = []
+        try:
+            for filename in all_files:
+                df = pd.read_csv(filename, index_col=None, header=0)
+                li.append(df)
+
+            frame = pd.concat(li, axis=0, ignore_index=True)
+            return frame
+
+        except FileNotFoundError:
+            raise ValueError('CSV file not found!')
+        except:
+            raise ValueError('Something wrong with CSV file operation!')
+
+    @staticmethod
+    def _familiarity_with_data(dataset):
+
+        # what's size and fullness datas
+        print('Dataset size', dataset.shape)
+        # print(dataset.info())
+
+        # what's columns and type of data
+        # print(dataset.head())
+        # for col in dataset.columns:
+        #     print(col)
+        # print('Districts=')
+        # city_data = dataset.loc[
+        #     (dataset['dist-city'] == 'Seattle') |
+        #     (dataset['dist-city'] == 'Bellevue') |
+        #     (dataset['dist-city'] == 'Burien') |
+        #     (dataset['dist-city'] == 'Black Diamond') |
+        #     (dataset['dist-city'] == 'Bothell') |
+        #     (dataset['dist-city'] == 'Auburn')
+        #
+        # ]
+
+
+
+        # top city
+        # print('Cities =', dataset['dist-city'].value_counts())
+
+        # city_data = city_data.sort_values('dist-city, dist-name')
+        # arr= city_data['dist-name'].unique()
+        # arr = city_data.drop_duplicates(subset=['dist-city', 'dist-name'], keep="first")
+        # arr = arr.sort_values('dist-city')
+        # arr = arr.loc[(arr['dist-city'] == 'Burien')]
+        #
+        # arr = arr[['dist-city', 'dist-name']]
+        # print(arr)
+        # debug = dataset.loc[(dataset['dist-name']=='Houghton') & (dataset['dist-city'] == 'Kirkland')]
+        # print(debug)
+
+
+    def _prepare_data(self, dataset):
+        '''
+        - remove duplicates
+        - remove rows without prices
+        - remove rows with city/district errors
+        - remove rudiment columns: web-scraper-order, web-scraper-start-url, house-page-link, house-page-link-href
+        - string prices to numbers
+        '''
+        p_data = self._remove_duplicates(dataset)
+        p_data = self._remove_property_without_price(p_data)
+        p_data = self._remove_place_errors(p_data)
+        p_data = self._get_rows_with_district_params(p_data)
+        # p_data = self._fix_place_errors(p_data)
+
+        p_data = self._remove_rudiment_columns(p_data)
+        p_data = self._add_district_params(p_data)
+        # p_data = self._strings_to_numbers(p_data)
+
+        return p_data
+
+    @staticmethod
+    def _remove_duplicates(dataset):
+        return dataset.drop_duplicates(subset="property_link-href", keep="first")
+
+    @staticmethod
+    def _remove_property_without_price(dataset):
+        return dataset.dropna(subset=['fin-price'])
+
+    @staticmethod
+    def _remove_place_errors(dataset):
+        d_with_removed_empty_cities = dataset.dropna(subset=['dist-city'])
+
+        d_with_removed_empty_districts_in_seattle = d_with_removed_empty_cities[
+            ((d_with_removed_empty_cities['dist-city'] == 'Seattle') &
+            (pd.notna(d_with_removed_empty_cities['dist-name']))) |
+            (d_with_removed_empty_cities['dist-city'] != 'Seattle')
+        ]
+        return d_with_removed_empty_districts_in_seattle
+
+    @staticmethod
+    def _get_rows_with_district_params(dataset):
+        # list of districts that we know its params
+        rows_with_district_params = dataset.loc[
+            (dataset['dist-city'] == 'Seattle') |
+            (dataset['dist-city'] == 'Bellevue') |
+            (dataset['dist-city'] == 'Burien') |
+            (dataset['dist-city'] == 'Black Diamond') |
+            (dataset['dist-city'] == 'Bothell') |
+            (dataset['dist-city'] == 'Auburn')
+            ]
+        return rows_with_district_params
+
+    @staticmethod
+    def _fix_place_errors(dataset):
+        # perhaps it isn't necessary
+        # Seattle Boulevard Park -> Burien Boulevard Park
+        mask_1 = (dataset['dist-city'] == 'Seattle') & (dataset['dist-name'] == 'Boulevard Park')
+        dataset.loc[mask_1, 'dist-city'] = 'Burien'
+
+        mask_2 = (dataset['dist-city'] == 'Burien') & (dataset['dist-name'] == 'Beverly Park')
+        print(dataset.loc[mask_2])
+        return dataset
+
+    @staticmethod
+    def _remove_rudiment_columns(dataset):
+        return dataset.drop(columns=['web-scraper-order', 'web-scraper-start-url', 'property_link',
+                                     'property_link-href'])
+
+    def _add_district_params(self, dataset):
+        districts_data = self._load_csv_data('districts')
+        merged_dataset = pd.merge(left=dataset, right=districts_data,
+                                  left_on=['dist-city', 'dist-name'], right_on=['dist-city', 'dist-name'])
+        return merged_dataset
+
+    @staticmethod
+    def _strings_to_numbers(dataset):
+        # prices
+        dataset['house-price'] = pd.to_numeric((dataset['house-price'].replace('[\$,]', '', regex=True)), errors='coerce')
+        dataset['house-price-sqft'] = pd.to_numeric((dataset['house-price-sqft'].replace('[\$,]', '', regex=True)), errors='coerce')
+        dataset['monthly-cost'] = pd.to_numeric((dataset['monthly-cost'].replace('[\$,]', '', regex=True)), errors='coerce')
+        dataset['principal-interest'] = pd.to_numeric((dataset['principal-interest'].replace('[\$,/mo]', '', regex=True)), errors='coerce')
+        dataset['property-taxes'] = pd.to_numeric((dataset['property-taxes'].replace('[\$,/mo]', '', regex=True)), errors='coerce')
+        dataset['home-insurance'] = pd.to_numeric((dataset['home-insurance'].replace('[\$,/mo]', '', regex=True)), errors='coerce')
+        dataset['rental-value'] = pd.to_numeric((dataset['rental-value'].replace('[\$,/mo]', '', regex=True)), errors='coerce')
+
+        # simple values
+        dataset['house-sqft'] = dataset['house-sqft'].replace(' ', '')
+
+        # dataset['house-sqft'] = (dataset['house-sqft'].replace(' ', '')).astype(float)
+
+
+        return dataset
 
 
 
@@ -46,8 +199,8 @@ class Data:
     def _get_command_line_arguments():
         ap = argparse.ArgumentParser()
         ap.add_argument("--op", required=True, help="Operation type")
-        ap.add_argument("--fo", required=True, help="Operation type with data file.")
-        ap.add_argument("--region", required=False, help="Region name for parsiong")
+        # ap.add_argument("--fo", required=True, help="Operation type with data file.")
+        ap.add_argument("--city_dir", required=False)
         args = vars(ap.parse_args())
         return args
 

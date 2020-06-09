@@ -1,4 +1,5 @@
-# Home Buyers Segmentation by Kmean segmentation
+# In work yet
+# Home Buyers Segmentation 
 
 Tags: Scikit-learn
 
