@@ -19,11 +19,13 @@ Usage:
 """
 
 import argparse
-import requests
-from lxml import html
 import os
+import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 import glob
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
+
 
 
 
@@ -36,7 +38,7 @@ class Data:
         if args['op'] == 'parse_data':
             city_data = self._load_csv_data(args['city_dir'])
 
-            self._familiarity_with_data(city_data)
+            # self._familiarity_with_data(city_data)
             prepared_data = self._prepare_data(city_data)
             self._familiarity_with_data(prepared_data)
 
@@ -70,20 +72,12 @@ class Data:
 
         # what's columns and type of data
         # print(dataset.head())
-        # for col in dataset.columns:
-        #     print(col)
-        # print('Districts=')
-        # city_data = dataset.loc[
-        #     (dataset['dist-city'] == 'Seattle') |
-        #     (dataset['dist-city'] == 'Bellevue') |
-        #     (dataset['dist-city'] == 'Burien') |
-        #     (dataset['dist-city'] == 'Black Diamond') |
-        #     (dataset['dist-city'] == 'Bothell') |
-        #     (dataset['dist-city'] == 'Auburn')
-        #
-        # ]
 
-
+        # familiarity with particular column
+        pd.set_option('display.float_format', lambda x: '%.1f' % x)
+        print(dataset['fin-price'].describe())
+        dataset.hist(column='fin-price')
+        plt.show()
 
         # top city
         # print('Cities =', dataset['dist-city'].value_counts())
@@ -101,21 +95,15 @@ class Data:
 
 
     def _prepare_data(self, dataset):
-        '''
-        - remove duplicates
-        - remove rows without prices
-        - remove rows with city/district errors
-        - remove rudiment columns: web-scraper-order, web-scraper-start-url, house-page-link, house-page-link-href
-        - string prices to numbers
-        '''
         p_data = self._remove_duplicates(dataset)
-        p_data = self._remove_property_without_price(p_data)
         p_data = self._remove_place_errors(p_data)
         p_data = self._get_rows_with_district_params(p_data)
         # p_data = self._fix_place_errors(p_data)
 
         p_data = self._remove_rudiment_columns(p_data)
         p_data = self._add_district_params(p_data)
+
+        p_data = self.prepare_data(p_data)
         # p_data = self._strings_to_numbers(p_data)
 
         return p_data
@@ -123,10 +111,6 @@ class Data:
     @staticmethod
     def _remove_duplicates(dataset):
         return dataset.drop_duplicates(subset="property_link-href", keep="first")
-
-    @staticmethod
-    def _remove_property_without_price(dataset):
-        return dataset.dropna(subset=['fin-price'])
 
     @staticmethod
     def _remove_place_errors(dataset):
@@ -173,6 +157,31 @@ class Data:
         merged_dataset = pd.merge(left=dataset, right=districts_data,
                                   left_on=['dist-city', 'dist-name'], right_on=['dist-city', 'dist-name'])
         return merged_dataset
+
+    def prepare_data(self, dataset):
+
+        prepared_data = self._prepare_prices(dataset)
+
+        return prepared_data
+
+    @staticmethod
+    def _prepare_prices(dataset):
+        # convert value to numer format
+        dataset['fin-price'] = pd.to_numeric((dataset['fin-price'].replace('[\$,]', '', regex=True)),
+                                               errors='coerce')
+        # fill nan values
+        # using median because fin-price is skewed data
+        dataset['fin-price'] = dataset['fin-price'].fillna(dataset['fin-price'].median())
+
+        # Transform Skewed Data
+        dataset['fin-price'] = np.log(dataset['fin-price'])
+
+        # normalize data
+        min_max_scaler = MinMaxScaler()
+        dataset[['fin-price']] = min_max_scaler.fit_transform(dataset[['fin-price']])
+
+        return dataset
+
 
     @staticmethod
     def _strings_to_numbers(dataset):
