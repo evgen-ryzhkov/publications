@@ -24,7 +24,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import glob
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.cluster import KMeans
 
 
 
@@ -39,8 +40,10 @@ class Data:
             city_data = self._load_csv_data(args['city_dir'])
 
             # self._familiarity_with_data(city_data)
-            prepared_data = self._prepare_data(city_data)
-            self._familiarity_with_data(prepared_data)
+            # data pre-processing
+            original_df, normalized_df = self._prepare_data(city_data)
+            self._familiarity_with_data(normalized_df)
+            self._get_segments(original_df, normalized_df)
 
     def _load_csv_data(self, city_dir):
         print('[INFO] Parsing started...')
@@ -68,16 +71,17 @@ class Data:
 
         # what's size and fullness datas
         print('Dataset size', dataset.shape)
-        # print(dataset.info())
+        print(dataset.info())
 
         # what's columns and type of data
         # print(dataset.head())
 
         # familiarity with particular column
-        pd.set_option('display.float_format', lambda x: '%.1f' % x)
-        print(dataset['fin-price'].describe())
-        dataset.hist(column='fin-price')
-        plt.show()
+        # pd.set_option('display.float_format', lambda x: '%.1f' % x)
+        # print(dataset['ob-beds'].describe())
+        # print(dataset['ob-beds'].isnull().sum(axis=0))
+        # dataset.hist(column='ob-beds')
+        # plt.show()
 
         # top city
         # print('Cities =', dataset['dist-city'].value_counts())
@@ -93,20 +97,64 @@ class Data:
         # debug = dataset.loc[(dataset['dist-name']=='Houghton') & (dataset['dist-city'] == 'Kirkland')]
         # print(debug)
 
-
     def _prepare_data(self, dataset):
-        p_data = self._remove_duplicates(dataset)
-        p_data = self._remove_place_errors(p_data)
-        p_data = self._get_rows_with_district_params(p_data)
+
+        original_df = self._remove_duplicates(dataset)
+        original_df = self._remove_place_errors(original_df)
+        original_df = self._get_rows_with_district_params(original_df)
         # p_data = self._fix_place_errors(p_data)
+        original_df = self._remove_rudiment_columns(original_df)
+        original_df = self._add_district_params(original_df)
+        original_df = self._convert_text_value_to_numbers(original_df)
+        original_df = self._fill_nan_values(original_df)
 
-        p_data = self._remove_rudiment_columns(p_data)
-        p_data = self._add_district_params(p_data)
-
-        p_data = self.prepare_data(p_data)
+        normalized_df = self._get_normalized_df(original_df)
         # p_data = self._strings_to_numbers(p_data)
 
-        return p_data
+        return original_df, normalized_df
+
+    def _get_segments(self, df_original, df_normalized):
+
+        # hyperparameter tuning
+        # get number of segments - elbow method
+        n_clusters = range(1, 10)
+        inertia = {}
+        inertia_values = []
+
+        for n in n_clusters:
+            model = KMeans(
+                n_clusters=n,
+                init='k-means++',
+                max_iter=500,
+                random_state=42)
+            model.fit(df_normalized)
+            inertia[n]=model.inertia_
+            inertia_values.append(model.inertia_)
+
+        for key, val in inertia.items():
+            print(str(key) + ' : ' + str(val))
+
+        plt.plot(n_clusters, inertia_values, 'bx-')
+        plt.xlabel('Values of K')
+        plt.ylabel('Inertia')
+        plt.title('The Elbow Method using Inertia')
+        plt.show()
+        # plot shows that 4 is optimal clusters number
+
+        # run model - get clusters
+        kmeans_model = KMeans(n_clusters=4, random_state=1)
+        kmeans_model.fit(df_normalized)
+
+        # Extract cluster labels
+        cluster_labels = kmeans_model.labels_
+
+        # Create a cluster label column in original dataset
+        df_new = df_original.assign(Cluster=cluster_labels)
+
+        # analyze segments
+        # Relative importance of segment attributes approach
+
+
 
     @staticmethod
     def _remove_duplicates(dataset):
@@ -158,29 +206,47 @@ class Data:
                                   left_on=['dist-city', 'dist-name'], right_on=['dist-city', 'dist-name'])
         return merged_dataset
 
-    def prepare_data(self, dataset):
-
-        prepared_data = self._prepare_prices(dataset)
-
-        return prepared_data
+    @staticmethod
+    def _convert_text_value_to_numbers(original_df):
+        # prices converting
+        original_df['fin-price'] = pd.to_numeric((original_df['fin-price'].replace('[\$,]', '', regex=True)),
+                                                 errors='coerce')
+        return original_df
 
     @staticmethod
-    def _prepare_prices(dataset):
-        # convert value to numer format
-        dataset['fin-price'] = pd.to_numeric((dataset['fin-price'].replace('[\$,]', '', regex=True)),
-                                               errors='coerce')
+    def _fill_nan_values(original_df):
         # fill nan values
         # using median because fin-price is skewed data
-        dataset['fin-price'] = dataset['fin-price'].fillna(dataset['fin-price'].median())
+        median_columns = ['fin-price', 'ob-beds']
+        for col in median_columns:
+            original_df[col] = original_df[col].fillna(original_df[col].median())
 
-        # Transform Skewed Data
-        dataset['fin-price'] = np.log(dataset['fin-price'])
+        return original_df
 
-        # normalize data
-        min_max_scaler = MinMaxScaler()
-        dataset[['fin-price']] = min_max_scaler.fit_transform(dataset[['fin-price']])
+    def _get_normalized_df(self, original_df):
+        '''
+            pre-processing data for k-mean segmentation:
+            - transform skewed data with log tranasformation
+            - normalize data
+        '''
+        necessary_columns = ['fin-price', 'ob-beds']
+        normalized_df = original_df
+        for col in necessary_columns:
+            # Transform Skewed Data
+            normalized_df[col] = np.log(normalized_df[col])
 
-        return dataset
+            # normalize data
+            min_max_scaler = MinMaxScaler()
+            normalized_df[[col]] = min_max_scaler.fit_transform(normalized_df[[col]])
+
+        # prepared_data = self._prepare_prices(original_df)
+        # prepared_data = self._prepare_beds(prepared_data)
+
+        # take only necessary columns
+        normalized_df = normalized_df[necessary_columns]
+
+        return normalized_df
+
 
 
     @staticmethod
@@ -201,8 +267,6 @@ class Data:
 
 
         return dataset
-
-
 
     @staticmethod
     def _get_command_line_arguments():
