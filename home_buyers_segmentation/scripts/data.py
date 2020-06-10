@@ -26,6 +26,7 @@ import matplotlib.pyplot as plt
 import glob
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.cluster import KMeans
+import seaborn as sns
 
 
 
@@ -35,14 +36,14 @@ class Data:
     def run(self):
         args = self._get_command_line_arguments()
 
-        # run parsing data
+        # load data
         if args['op'] == 'parse_data':
             city_data = self._load_csv_data(args['city_dir'])
 
             # self._familiarity_with_data(city_data)
             # data pre-processing
             original_df, normalized_df = self._prepare_data(city_data)
-            self._familiarity_with_data(normalized_df)
+            # self._familiarity_with_data(normalized_df)
             self._get_segments(original_df, normalized_df)
 
     def _load_csv_data(self, city_dir):
@@ -117,28 +118,28 @@ class Data:
 
         # hyperparameter tuning
         # get number of segments - elbow method
-        n_clusters = range(1, 10)
-        inertia = {}
-        inertia_values = []
-
-        for n in n_clusters:
-            model = KMeans(
-                n_clusters=n,
-                init='k-means++',
-                max_iter=500,
-                random_state=42)
-            model.fit(df_normalized)
-            inertia[n]=model.inertia_
-            inertia_values.append(model.inertia_)
-
-        for key, val in inertia.items():
-            print(str(key) + ' : ' + str(val))
-
-        plt.plot(n_clusters, inertia_values, 'bx-')
-        plt.xlabel('Values of K')
-        plt.ylabel('Inertia')
-        plt.title('The Elbow Method using Inertia')
-        plt.show()
+        # n_clusters = range(1, 10)
+        # inertia = {}
+        # inertia_values = []
+        #
+        # for n in n_clusters:
+        #     model = KMeans(
+        #         n_clusters=n,
+        #         init='k-means++',
+        #         max_iter=500,
+        #         random_state=42)
+        #     model.fit(df_normalized)
+        #     inertia[n]=model.inertia_
+        #     inertia_values.append(model.inertia_)
+        #
+        # for key, val in inertia.items():
+        #     print(str(key) + ' : ' + str(val))
+        #
+        # plt.plot(n_clusters, inertia_values, 'bx-')
+        # plt.xlabel('Values of K')
+        # plt.ylabel('Inertia')
+        # plt.title('The Elbow Method using Inertia')
+        # plt.show()
         # plot shows that 4 is optimal clusters number
 
         # run model - get clusters
@@ -150,9 +151,36 @@ class Data:
 
         # Create a cluster label column in original dataset
         df_new = df_original.assign(Cluster=cluster_labels)
+        # df_temp = df_new[['ob-beds', 'fin-price']]
+        # print(df_temp.head())
+
+        # show clasters stats
+        print('[INFO] Clusters stat ------------')
+        df_stat = df_new.groupby(['Cluster']).agg({
+           'ob-beds': ['mean', 'count'],
+           'fin-price': 'mean',
+        }).round(0)
+        print(df_stat)
 
         # analyze segments
-        # Relative importance of segment attributes approach
+        # snake plot approach
+        # Transform df_normal as df and add cluster column
+        df_normalized = pd.DataFrame(df_normalized,
+                                         index=df_original.index,
+                                         columns=df_original.columns)
+        df_normalized['Cluster'] = df_new['Cluster']
+
+        # Melt data into long format
+        df_melt = pd.melt(df_normalized.reset_index(),
+                          id_vars=['Cluster'],
+                          value_vars=['ob-beds', 'fin-price'],
+                          var_name='Metric',
+                          value_name='Value')
+
+        plt.xlabel('Metric')
+        plt.ylabel('Value')
+        sns.pointplot(data=df_melt, x='Metric', y='Value', hue='Cluster')
+        plt.show()
 
 
 
@@ -223,24 +251,23 @@ class Data:
 
         return original_df
 
-    def _get_normalized_df(self, original_df):
+    @staticmethod
+    def _get_normalized_df(original_df):
         '''
             pre-processing data for k-mean segmentation:
             - transform skewed data with log tranasformation
             - normalize data
         '''
         necessary_columns = ['fin-price', 'ob-beds']
-        normalized_df = original_df
+        normalized_df = original_df.copy()
+        min_max_scaler = MinMaxScaler()
+
         for col in necessary_columns:
             # Transform Skewed Data
             normalized_df[col] = np.log(normalized_df[col])
 
             # normalize data
-            min_max_scaler = MinMaxScaler()
             normalized_df[[col]] = min_max_scaler.fit_transform(normalized_df[[col]])
-
-        # prepared_data = self._prepare_prices(original_df)
-        # prepared_data = self._prepare_beds(prepared_data)
 
         # take only necessary columns
         normalized_df = normalized_df[necessary_columns]
