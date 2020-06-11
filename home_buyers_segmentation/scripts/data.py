@@ -26,6 +26,8 @@ import numpy as np
 import pandas as pd
 import glob
 from sklearn.preprocessing import MinMaxScaler
+import matplotlib.pyplot as plt
+import random
 
 
 class Data:
@@ -41,7 +43,7 @@ class Data:
             original_df, normalized_df = self._prepare_data(city_data)
             # self._familiarity_with_data(original_df)
             segmented_df = get_segments(original_df, normalized_df)
-            # analyse_segments(original_df, normalized_df, segmented_df)
+            analyse_segments(original_df, normalized_df, segmented_df)
 
     @staticmethod
     def _load_csv_data(city_dir):
@@ -70,15 +72,16 @@ class Data:
 
         # what's size and fullness datas
         # print('Dataset size', dataset.shape)
-        print(dataset.info())
+        # print(dataset.info())
 
         # what's columns and type of data
         # print(dataset.head())
 
         # familiarity with particular column
         # pd.set_option('display.float_format', lambda x: '%.1f' % x)
-        # print(dataset['crime-rate'].describe())
-        print(dataset['crime-rate'].unique())
+        print(dataset['quiet-rate'].describe())
+
+        # print(dataset['quiet-rate'].unique())
         # print(dataset['lot-size'].value_counts())
         # print(dataset['ob-beds'].isnull().sum(axis=0))
         # dataset.hist(column='ob-beds')
@@ -196,45 +199,71 @@ class Data:
         original_df['lot-size'] = pd.to_numeric((original_df['lot-size'].replace('[\, sqft]', '', regex=True)),
                                                                        errors='coerce')
 
-        # ob-type
-        # creating custorm column with numeric categories
-        # - Single Family Home -> 1
-        # - Condo              -> 4
-        # - Townhouse          -> 3
-        # - Multi Family       -> 2
-        original_df.loc[original_df['ob-type-1'].eq('Single Family Home'), 'ob-type'] = 1
-        original_df.loc[original_df['ob-type-2'].eq('Condo'), 'ob-type'] = 4
-        original_df.loc[original_df['ob-type-3'].eq('Townhouse'), 'ob-type'] = 3
-        original_df.loc[original_df['ob-type-4'].eq('Multi Family'), 'ob-type'] = 2
+        # for lot data NaN change to 0
+        # because there are houses without lots, and they have 0 (NaN) lot-size
+        original_df['lot-size'] = original_df['lot-size'].fillna(0)
+
+
+        # most single family houses have 1 or 2 stories, and their proportion is about equal
+        # so NaN stories replace for 1 or 2 in random maner
+        original_df['ob-stories'] = original_df['ob-stories'].fillna(pd.Series(np.random.choice([1, 2], size=len(original_df.index))))
+
+        # for NaN ob-type replace to Single Family Home as they the most number
+        original_df.loc[
+            (original_df['ob-type-1'].isnull()) &
+            (original_df['ob-type-2'].isnull()) &
+            (original_df['ob-type-3'].isnull()) &
+            (original_df['ob-type-4'].isnull()), 'ob-type-1'] = 'Single Family Home'
+
+
+        # кастомные категоризация для домов. учитывается комбинация тип жилья + его этажность (для Single Family)
+        original_df.loc[original_df['ob-type-2'].eq('Condo'), 'ob-type'] = 1
+        original_df.loc[original_df['ob-type-3'].eq('Townhouse'), 'ob-type'] = 2
+        original_df.loc[original_df['ob-type-4'].eq('Multi Family'), 'ob-type'] = 3
+        original_df.loc[(original_df['ob-type-1'].eq('Single Family Home')) & (original_df['ob-stories'] == 1), 'ob-type'] = 4
+        original_df.loc[(original_df['ob-type-1'].eq('Single Family Home')) & (original_df['ob-stories'] == 2), 'ob-type'] = 5
+        original_df.loc[(original_df['ob-type-1'].eq('Single Family Home')) & (original_df['ob-stories'] > 2), 'ob-type'] = 6
+
+        print(original_df['ob-type'].describe())
+        print(original_df['ob-type'].unique())
+
 
         # commute-rate, crime-rate, outdoor-activities-rate have Letter type categorisation
         # convert it into numeric
-        original_df = original_df.replace(regex=r'^D-$', value=0)
-        original_df = original_df.replace(regex=r'^D$', value=1)
-        original_df = original_df.replace(regex=r'^D\+$', value=2)
-        original_df = original_df.replace(regex=r'^C-$', value=3)
-        original_df = original_df.replace(regex=r'^C$', value=4)
-        original_df = original_df.replace(regex=r'^C\+$', value=5)
-        original_df = original_df.replace(regex=r'^B-$', value=6)
-        original_df = original_df.replace(regex=r'^B$', value=7)
-        original_df = original_df.replace(regex=r'^B\+$', value=8)
-        original_df = original_df.replace(regex=r'^A-$', value=9)
-        original_df = original_df.replace(regex=r'^A$', value=10)
-        original_df = original_df.replace(regex=r'^A\+$', value=11)
+        original_df = original_df.replace(regex=r'^D', value=1)
+        original_df = original_df.replace(regex=r'^C', value=2)
+        original_df = original_df.replace(regex=r'^B', value=3)
+        original_df = original_df.replace(regex=r'^A', value=4)
 
         original_df.loc[original_df['ob-dining-room'].eq('Dining Room'), 'ob-dining-room'] = 1
         original_df.loc[original_df['ob-walk-in-closet'].eq('Walk In Closet'), 'ob-walk-in-closet'] = 1
         original_df.loc[original_df['ob-laundry-room'].eq('Laundry Room'), 'ob-laundry-room'] = 1
         original_df.loc[original_df['ob-basement'].str.contains(pat="Bas", na=1), 'ob-basement'] = 1
 
-        # print('-walk-in-closet')
-        # print(original_df['ob-walk-in-closet'].describe())
+        original_df.loc[original_df['quiet-rate'] <= 40, 'quiet-rate'] = 1
+        original_df.loc[(original_df['quiet-rate'] > 40) & (original_df['quiet-rate'] <= 70), 'quiet-rate'] = 2
+        original_df.loc[original_df['quiet-rate'] > 70, 'quiet-rate'] = 3
+
+        original_df.loc[original_df['distance-downtown'] <= 20, 'distance-downtown'] = 4
+        original_df.loc[(original_df['distance-downtown'] > 20) & (original_df['distance-downtown'] <= 40), 'distance-downtown'] = 3
+        original_df.loc[(original_df['distance-downtown'] > 40) & (original_df['distance-downtown'] <= 60), 'distance-downtown'] = 2
+        original_df.loc[original_df['distance-downtown'] > 60, 'distance-downtown'] = 1
+
+        original_df.loc[original_df['ob-sqft'] <= 1076, 'ob-sqft'] = 1
+        original_df.loc[(original_df['ob-sqft'] > 1076) & (original_df['ob-sqft'] <= 1615), 'ob-sqft'] = 2 # S > 100 and < 150 m2
+        original_df.loc[(original_df['ob-sqft'] > 1615) & (original_df['ob-sqft'] <= 2153), 'ob-sqft'] = 3 #  S > 150 and < 200 m2
+        original_df.loc[original_df['ob-sqft'] > 2153, 'ob-sqft'] = 4 # S > 200m2
+
+        original_df.loc[original_df['lot-size'] == 0, 'lot-size'] = 1
+        original_df.loc[(original_df['lot-size'] > 1) & (original_df['lot-size'] <= 3441), 'lot-size'] = 2
+        original_df.loc[(original_df['lot-size'] > 3441) & (original_df['lot-size'] <= 6004.75), 'lot-size'] = 3
+        original_df.loc[original_df['lot-size'] > 6004.75, 'lot-size'] = 4
+
+        # original_df.hist(column='lot-size')
+        # plt.show()
+        # print(original_df['lot-size'].describe())
+        # print(original_df['lot-size'].unique())
         # print(original_df['ob-walk-in-closet'].unique())
-        print('ob-basement')
-        print(original_df['ob-basement'].unique())
-        # print('ob-laundry-room')
-        # print(original_df['ob-laundry-room'].describe())
-        # print(original_df['ob-laundry-room'].unique())
 
         return original_df
 
@@ -246,20 +275,17 @@ class Data:
         for col in median_columns:
             original_df[col] = original_df[col].fillna(original_df[col].median())
 
-        # for lot data NaN change to 0
-        # because there are houses without lots, and they have 0 (NaN) lot-size
-        # fillna 1 instead of 0 because normalize give an error
-        original_df['lot-size'] = original_df['lot-size'].fillna(1)
+
 
         # 1 is because the most object is the 1 type
-        original_df['ob-type'] = original_df['lot-size'].fillna(1)
+        # original_df['ob-type'] = original_df['ob-type'].fillna(1)
         # 2 is because the mean for ob-stories
-        original_df['ob-stories'] = original_df['lot-size'].fillna(2)
+        # original_df['ob-stories'] = original_df['ob-stories'].fillna(2)
 
         # I don't know why by 0 in Excel is NaN id Dataframe
-        original_df['middle-schools-rate'] = original_df['lot-size'].fillna(0)
-        original_df['high-schools-rate'] = original_df['lot-size'].fillna(0)
-        original_df['private-schools-num'] = original_df['lot-size'].fillna(0)
+        original_df['middle-schools-rate'] = original_df['middle-schools-rate'].fillna(1)
+        original_df['high-schools-rate'] = original_df['high-schools-rate'].fillna(1)
+        original_df['private-schools-num'] = original_df['private-schools-num'].fillna(1)
 
         # 0 - is equal to False for house feature
         original_df['ob-dining-room'] = original_df['ob-dining-room'].fillna(0)
@@ -274,9 +300,9 @@ class Data:
             - transform skewed data with log tranasformation
             - normalize data
         '''
-        necessary_columns = ['fin-price', 'ob-beds', 'ob-bath', 'ob-sqft', 'lot-size', 'ob-type', 'ob-stories',
+        necessary_columns = ['fin-price', 'ob-beds', 'ob-bath', 'ob-sqft', 'lot-size', 'ob-type',
                              'distance-downtown', 'commute-rate', 'crime-rate', 'dog-friendly-rate', 'quiet-rate',
-                             'elem-schools-rate', 'middle-schools-rate', 'high-schools-rate', 'private-schools-num']
+                             'elem-schools-rate']
         normalized_df = original_df.copy()
         min_max_scaler = MinMaxScaler()
 
@@ -285,7 +311,10 @@ class Data:
             normalized_df[col] = np.log(normalized_df[col])
 
             # normalize data
-            normalized_df[[col]] = min_max_scaler.fit_transform(normalized_df[[col]])
+            try:
+                normalized_df[[col]] = min_max_scaler.fit_transform(normalized_df[[col]])
+            except:
+                print(normalized_df[col])
 
         # take only necessary columns
         normalized_df = normalized_df[necessary_columns]
