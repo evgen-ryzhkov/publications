@@ -17,18 +17,15 @@ Usage:
     parse data: python -m scripts.data.py --op=parse_data --city_dir=[dir_name_inside_data_dir]
 
 """
+from .k_means_segmentation import get_segments
+from .segments_analysis import analyse_segments
 
 import argparse
 import os
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import glob
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.cluster import KMeans
-import seaborn as sns
-
-
 
 
 class Data:
@@ -41,12 +38,13 @@ class Data:
             city_data = self._load_csv_data(args['city_dir'])
 
             # self._familiarity_with_data(city_data)
-            # data pre-processing
             original_df, normalized_df = self._prepare_data(city_data)
-            self._familiarity_with_data(original_df)
-            self._get_segments(original_df, normalized_df)
+            # self._familiarity_with_data(original_df)
+            segmented_df = get_segments(original_df, normalized_df)
+            # analyse_segments(original_df, normalized_df, segmented_df)
 
-    def _load_csv_data(self, city_dir):
+    @staticmethod
+    def _load_csv_data(city_dir):
         print('[INFO] Parsing started...')
         DATA_DIR = 'data/'
 
@@ -78,9 +76,10 @@ class Data:
         # print(dataset.head())
 
         # familiarity with particular column
-        pd.set_option('display.float_format', lambda x: '%.1f' % x)
-        # print(dataset['lot-size'].describe())
-        print(dataset['lot-size'].value_counts())
+        # pd.set_option('display.float_format', lambda x: '%.1f' % x)
+        # print(dataset['crime-rate'].describe())
+        print(dataset['crime-rate'].unique())
+        # print(dataset['lot-size'].value_counts())
         # print(dataset['ob-beds'].isnull().sum(axis=0))
         # dataset.hist(column='ob-beds')
         # plt.show()
@@ -105,85 +104,14 @@ class Data:
         original_df = self._remove_place_errors(original_df)
         original_df = self._get_rows_with_district_params(original_df)
         # p_data = self._fix_place_errors(p_data)
-        original_df = self._remove_rudiment_columns(original_df)
         original_df = self._add_district_params(original_df)
         original_df = self._convert_text_value_to_numbers(original_df)
+        original_df = self._remove_rudiment_columns(original_df)
         original_df = self._fill_nan_values(original_df)
 
         normalized_df = self._get_normalized_df(original_df)
 
         return original_df, normalized_df
-
-    def _get_segments(self, df_original, df_normalized):
-
-        # hyperparameter tuning
-        # get number of segments - elbow method
-        # n_clusters = range(1, 10)
-        # inertia = {}
-        # inertia_values = []
-        #
-        # for n in n_clusters:
-        #     model = KMeans(
-        #         n_clusters=n,
-        #         init='k-means++',
-        #         max_iter=500,
-        #         random_state=42)
-        #     model.fit(df_normalized)
-        #     inertia[n]=model.inertia_
-        #     inertia_values.append(model.inertia_)
-        #
-        # for key, val in inertia.items():
-        #     print(str(key) + ' : ' + str(val))
-        #
-        # plt.plot(n_clusters, inertia_values, 'bx-')
-        # plt.xlabel('Values of K')
-        # plt.ylabel('Inertia')
-        # plt.title('The Elbow Method using Inertia')
-        # plt.show()
-        # plot shows that 3 is optimal clusters number
-
-        # run model - get clusters
-        kmeans_model = KMeans(n_clusters=3, random_state=1)
-        kmeans_model.fit(df_normalized)
-
-        # Extract cluster labels
-        cluster_labels = kmeans_model.labels_
-
-        # Create a cluster label column in original dataset
-        df_new = df_original.assign(Cluster=cluster_labels)
-        # df_temp = df_new[['ob-beds', 'fin-price']]
-        # print(df_temp.head())
-
-        # analyze segments --------------------------
-        # show clasters stats
-        print('[INFO] Clusters stat ------------')
-        print(df_new.info())
-        df_stat_count = df_new.groupby('Cluster').size()
-        print(df_stat_count)
-        df_stat_count.plot.bar()
-        plt.show()
-
-
-
-        # snake plot approach
-        # Transform df_normal as df and add cluster column
-        df_normalized = pd.DataFrame(df_normalized,
-                                         index=df_original.index,
-                                         columns=df_original.columns)
-        df_normalized['Cluster'] = df_new['Cluster']
-
-        # Melt data into long format
-        df_melt = pd.melt(df_normalized.reset_index(),
-                          id_vars=['Cluster'],
-                          value_vars=['ob-beds', 'fin-price', 'ob-bath', 'ob-sqft', 'lot-size'],
-                          var_name='Metric',
-                          value_name='Value')
-
-        plt.xlabel('Metric')
-        plt.ylabel('Value')
-        sns.pointplot(data=df_melt, x='Metric', y='Value', hue='Cluster')
-        plt.show()
-
 
 
     @staticmethod
@@ -228,7 +156,7 @@ class Data:
     @staticmethod
     def _remove_rudiment_columns(dataset):
         return dataset.drop(columns=['web-scraper-order', 'web-scraper-start-url', 'property_link',
-                                     'property_link-href'])
+                                     'property_link-href', 'ob-type-1', 'ob-type-2', 'ob-type-3', 'ob-type-4'])
 
     def _add_district_params(self, dataset):
         districts_data = self._load_csv_data('districts')
@@ -267,6 +195,47 @@ class Data:
         # convert to numeric values, rows that contains sqft
         original_df['lot-size'] = pd.to_numeric((original_df['lot-size'].replace('[\, sqft]', '', regex=True)),
                                                                        errors='coerce')
+
+        # ob-type
+        # creating custorm column with numeric categories
+        # - Single Family Home -> 1
+        # - Condo              -> 4
+        # - Townhouse          -> 3
+        # - Multi Family       -> 2
+        original_df.loc[original_df['ob-type-1'].eq('Single Family Home'), 'ob-type'] = 1
+        original_df.loc[original_df['ob-type-2'].eq('Condo'), 'ob-type'] = 4
+        original_df.loc[original_df['ob-type-3'].eq('Townhouse'), 'ob-type'] = 3
+        original_df.loc[original_df['ob-type-4'].eq('Multi Family'), 'ob-type'] = 2
+
+        # commute-rate, crime-rate, outdoor-activities-rate have Letter type categorisation
+        # convert it into numeric
+        original_df = original_df.replace(regex=r'^D-$', value=0)
+        original_df = original_df.replace(regex=r'^D$', value=1)
+        original_df = original_df.replace(regex=r'^D\+$', value=2)
+        original_df = original_df.replace(regex=r'^C-$', value=3)
+        original_df = original_df.replace(regex=r'^C$', value=4)
+        original_df = original_df.replace(regex=r'^C\+$', value=5)
+        original_df = original_df.replace(regex=r'^B-$', value=6)
+        original_df = original_df.replace(regex=r'^B$', value=7)
+        original_df = original_df.replace(regex=r'^B\+$', value=8)
+        original_df = original_df.replace(regex=r'^A-$', value=9)
+        original_df = original_df.replace(regex=r'^A$', value=10)
+        original_df = original_df.replace(regex=r'^A\+$', value=11)
+
+        original_df.loc[original_df['ob-dining-room'].eq('Dining Room'), 'ob-dining-room'] = 1
+        original_df.loc[original_df['ob-walk-in-closet'].eq('Walk In Closet'), 'ob-walk-in-closet'] = 1
+        original_df.loc[original_df['ob-laundry-room'].eq('Laundry Room'), 'ob-laundry-room'] = 1
+        original_df.loc[original_df['ob-basement'].str.contains(pat="Bas", na=1), 'ob-basement'] = 1
+
+        # print('-walk-in-closet')
+        # print(original_df['ob-walk-in-closet'].describe())
+        # print(original_df['ob-walk-in-closet'].unique())
+        print('ob-basement')
+        print(original_df['ob-basement'].unique())
+        # print('ob-laundry-room')
+        # print(original_df['ob-laundry-room'].describe())
+        # print(original_df['ob-laundry-room'].unique())
+
         return original_df
 
     @staticmethod
@@ -282,6 +251,20 @@ class Data:
         # fillna 1 instead of 0 because normalize give an error
         original_df['lot-size'] = original_df['lot-size'].fillna(1)
 
+        # 1 is because the most object is the 1 type
+        original_df['ob-type'] = original_df['lot-size'].fillna(1)
+        # 2 is because the mean for ob-stories
+        original_df['ob-stories'] = original_df['lot-size'].fillna(2)
+
+        # I don't know why by 0 in Excel is NaN id Dataframe
+        original_df['middle-schools-rate'] = original_df['lot-size'].fillna(0)
+        original_df['high-schools-rate'] = original_df['lot-size'].fillna(0)
+        original_df['private-schools-num'] = original_df['lot-size'].fillna(0)
+
+        # 0 - is equal to False for house feature
+        original_df['ob-dining-room'] = original_df['ob-dining-room'].fillna(0)
+
+
         return original_df
 
     @staticmethod
@@ -291,7 +274,9 @@ class Data:
             - transform skewed data with log tranasformation
             - normalize data
         '''
-        necessary_columns = ['fin-price', 'ob-beds', 'ob-bath', 'ob-sqft', 'lot-size']
+        necessary_columns = ['fin-price', 'ob-beds', 'ob-bath', 'ob-sqft', 'lot-size', 'ob-type', 'ob-stories',
+                             'distance-downtown', 'commute-rate', 'crime-rate', 'dog-friendly-rate', 'quiet-rate',
+                             'elem-schools-rate', 'middle-schools-rate', 'high-schools-rate', 'private-schools-num']
         normalized_df = original_df.copy()
         min_max_scaler = MinMaxScaler()
 
