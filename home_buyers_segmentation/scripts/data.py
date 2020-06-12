@@ -1,11 +1,11 @@
 """
-Driving license reader
+Home buyers segmentation by property and district features
 
 Input:
-    - Photo of driving license (it could be holding by hand)
+    - Seattle sold properties
+    - Seattle districts ratings
 Output:
-    - Scan of the document: must to have rather pretty view (approximately like it usually have scanned document view)
-    - Text data: First, Last Names (Latin letters), Birth date, driving license ID number.
+
 
 Written by Evgeniy Ryzhkov
 
@@ -39,11 +39,11 @@ class Data:
         if args['op'] == 'parse_data':
             city_data = self._load_csv_data(args['city_dir'])
 
-            # self._familiarity_with_data(city_data)
-            original_df, normalized_df = self._prepare_data(city_data)
+            self._familiarity_with_data(city_data)
+            # original_df, normalized_df = self._prepare_data(city_data)
             # self._familiarity_with_data(original_df)
-            segmented_df = get_segments(original_df, normalized_df)
-            analyse_segments(original_df, normalized_df, segmented_df)
+            # segmented_df = get_segments(original_df, normalized_df)
+            # analyse_segments(original_df, normalized_df, segmented_df)
 
     @staticmethod
     def _load_csv_data(city_dir):
@@ -72,14 +72,19 @@ class Data:
 
         # what's size and fullness datas
         # print('Dataset size', dataset.shape)
-        # print(dataset.info())
+        print(dataset.info())
+
+        df_houses = dataset.loc[(dataset['ob-type-1'] == 'Single Family Home') |
+                           (dataset['ob-type-4'] == 'Multi Family') |
+                           (dataset['ob-type-3'] == 'Townhouse')]
+        print(len(df_houses))
 
         # what's columns and type of data
         # print(dataset.head())
 
         # familiarity with particular column
         # pd.set_option('display.float_format', lambda x: '%.1f' % x)
-        print(dataset['quiet-rate'].describe())
+        # print(dataset['quiet-rate'].describe())
 
         # print(dataset['quiet-rate'].unique())
         # print(dataset['lot-size'].value_counts())
@@ -106,10 +111,10 @@ class Data:
         original_df = self._remove_duplicates(dataset)
         original_df = self._remove_place_errors(original_df)
         original_df = self._get_rows_with_district_params(original_df)
-        # p_data = self._fix_place_errors(p_data)
+        #p_data = self._fix_place_errors(p_data)
         original_df = self._add_district_params(original_df)
         original_df = self._convert_text_value_to_numbers(original_df)
-        original_df = self._remove_rudiment_columns(original_df)
+        # original_df = self._remove_rudiment_columns(original_df)
         original_df = self._fill_nan_values(original_df)
 
         normalized_df = self._get_normalized_df(original_df)
@@ -162,7 +167,13 @@ class Data:
                                      'property_link-href', 'ob-type-1', 'ob-type-2', 'ob-type-3', 'ob-type-4'])
 
     def _add_district_params(self, dataset):
+
         districts_data = self._load_csv_data('districts')
+
+        temp = dataset[['dist-city', 'dist-name']].drop_duplicates()
+        print(temp)
+
+        print('Districts =',districts_data.groupby(['dist-city', 'dist-name']).apply(list))
         merged_dataset = pd.merge(left=dataset, right=districts_data,
                                   left_on=['dist-city', 'dist-name'], right_on=['dist-city', 'dist-name'])
         return merged_dataset
@@ -224,10 +235,6 @@ class Data:
         original_df.loc[(original_df['ob-type-1'].eq('Single Family Home')) & (original_df['ob-stories'] == 2), 'ob-type'] = 5
         original_df.loc[(original_df['ob-type-1'].eq('Single Family Home')) & (original_df['ob-stories'] > 2), 'ob-type'] = 6
 
-        print(original_df['ob-type'].describe())
-        print(original_df['ob-type'].unique())
-
-
         # commute-rate, crime-rate, outdoor-activities-rate have Letter type categorisation
         # convert it into numeric
         original_df = original_df.replace(regex=r'^D', value=1)
@@ -235,7 +242,7 @@ class Data:
         original_df = original_df.replace(regex=r'^B', value=3)
         original_df = original_df.replace(regex=r'^A', value=4)
 
-        original_df.loc[original_df['ob-dining-room'].eq('Dining Room'), 'ob-dining-room'] = 1
+        original_df.loc[original_df['ob-dining-room'].eq('Dining Room'), 'ob-dining-room'] = 2
         original_df.loc[original_df['ob-walk-in-closet'].eq('Walk In Closet'), 'ob-walk-in-closet'] = 1
         original_df.loc[original_df['ob-laundry-room'].eq('Laundry Room'), 'ob-laundry-room'] = 1
         original_df.loc[original_df['ob-basement'].str.contains(pat="Bas", na=1), 'ob-basement'] = 1
@@ -259,9 +266,18 @@ class Data:
         original_df.loc[(original_df['lot-size'] > 3441) & (original_df['lot-size'] <= 6004.75), 'lot-size'] = 3
         original_df.loc[original_df['lot-size'] > 6004.75, 'lot-size'] = 4
 
+        # change schools from 10 grades to 4
+        # schools_rate_medium = original_df.groupby(['elem-schools-rate', 'COL2'])[['COL3','COL4']].apply(np.median)
+        original_df['schools-rate'] = np.median([
+            original_df['elem-schools-rate'],
+            original_df['middle-schools-rate'],
+            original_df['high-schools-rate'],
+        ], axis=0)
+
         # original_df.hist(column='lot-size')
         # plt.show()
-        # print(original_df['lot-size'].describe())
+        # print(original_df[['schools-rate', 'elem-schools-rate', 'middle-schools-rate']])
+        # print(original_df['schools-rate'].describe())
         # print(original_df['lot-size'].unique())
         # print(original_df['ob-walk-in-closet'].unique())
 
@@ -283,12 +299,11 @@ class Data:
         # original_df['ob-stories'] = original_df['ob-stories'].fillna(2)
 
         # I don't know why by 0 in Excel is NaN id Dataframe
-        original_df['middle-schools-rate'] = original_df['middle-schools-rate'].fillna(1)
-        original_df['high-schools-rate'] = original_df['high-schools-rate'].fillna(1)
+
         original_df['private-schools-num'] = original_df['private-schools-num'].fillna(1)
 
         # 0 - is equal to False for house feature
-        original_df['ob-dining-room'] = original_df['ob-dining-room'].fillna(0)
+        original_df['ob-dining-room'] = original_df['ob-dining-room'].fillna(1)
 
 
         return original_df
@@ -300,9 +315,9 @@ class Data:
             - transform skewed data with log tranasformation
             - normalize data
         '''
-        necessary_columns = ['fin-price', 'ob-beds', 'ob-bath', 'ob-sqft', 'lot-size', 'ob-type',
+        necessary_columns = ['fin-price', 'ob-beds', 'ob-bath', 'ob-sqft', 'lot-size', 'ob-type', 'ob-dining-room',
                              'distance-downtown', 'commute-rate', 'crime-rate', 'dog-friendly-rate', 'quiet-rate',
-                             'elem-schools-rate']
+                             'schools-rate']
         normalized_df = original_df.copy()
         min_max_scaler = MinMaxScaler()
 

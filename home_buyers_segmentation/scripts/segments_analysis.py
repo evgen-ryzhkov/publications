@@ -25,7 +25,7 @@ def analyse_segments(df_original, df_normalized, df_segmented):
                       value_vars=['ob-type', 'ob-beds', 'ob-bath', 'ob-sqft',
                                   'lot-size',
                                   'distance-downtown', 'commute-rate', 'crime-rate', 'dog-friendly-rate', 'quiet-rate',
-                                  'elem-schools-rate',
+                                  'schools-rate',
                                   'fin-price'],
                       var_name='Metric',
                       value_name='Value')
