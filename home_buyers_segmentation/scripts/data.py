@@ -37,9 +37,13 @@ class Data:
 
         # load data
         if args['op'] == 'parse_data':
-            city_data = self._load_csv_data(args['city_dir'])
+            df_city_loaded = self._load_csv_data(args['city_dir'])
 
-            self._familiarity_with_data(city_data)
+            # house feature analysis
+            df_houses = self._get_df_houses(df_city_loaded)
+
+            # customer segmentation --------------------
+            # self._familiarity_with_data(city_data)
             # original_df, normalized_df = self._prepare_data(city_data)
             # self._familiarity_with_data(original_df)
             # segmented_df = get_segments(original_df, normalized_df)
@@ -106,6 +110,28 @@ class Data:
         # debug = dataset.loc[(dataset['dist-name']=='Houghton') & (dataset['dist-city'] == 'Kirkland')]
         # print(debug)
 
+    def _get_df_houses(self, df_city_loaded):
+        print(df_city_loaded.info())
+
+        df_houses = self._remove_duplicates(df_city_loaded)
+        # df_houses = self._remove_apartments(df_houses)
+        df_houses = self._remove_place_errors(df_houses)
+
+        df_houses = self._convert_text_values(df_houses)
+        df_houses = self._fill_missed_values(df_houses)
+        df_houses = self._create_custom_features(df_houses)
+
+        df_houses_short = self._get_short_df(df_houses)
+        # expplore_df = df_houses_short.loc[(df_houses_short['dist-city'] == 'Seattle') & (df_houses_short['dist-name'] == 'Westlake')]
+        #
+        # pd.set_option('display.float_format', lambda x: '%.1f' % x)
+        # print(expplore_df['fin-price'].describe())
+
+         # print(df_houses_short['fin-price'].describe())
+        # self._define_correlations(df_houses_short)
+
+        return df_houses
+
     def _prepare_data(self, dataset):
 
         original_df = self._remove_duplicates(dataset)
@@ -125,6 +151,13 @@ class Data:
     @staticmethod
     def _remove_duplicates(dataset):
         return dataset.drop_duplicates(subset="property_link-href", keep="first")
+
+    @staticmethod
+    def _remove_apartments(dataset):
+        df_without_apartments = dataset.loc[(dataset['ob-type-1'] == 'Single Family Home') |
+                                (dataset['ob-type-4'] == 'Multi Family') |
+                                (dataset['ob-type-3'] == 'Townhouse')]
+        return df_without_apartments
 
     @staticmethod
     def _remove_place_errors(dataset):
@@ -177,6 +210,72 @@ class Data:
         merged_dataset = pd.merge(left=dataset, right=districts_data,
                                   left_on=['dist-city', 'dist-name'], right_on=['dist-city', 'dist-name'])
         return merged_dataset
+
+    @staticmethod
+    def _convert_text_values(df_houses):
+        # price
+        # input format $1,000
+        # output: 1000
+        df_houses['fin-price'] = pd.to_numeric((df_houses['fin-price'].replace('[\$,]', '', regex=True)),
+                                                 errors='coerce')
+
+        # ob-sqft
+        # input 1,000
+        # output 1000
+        df_houses['ob-sqft'] = pd.to_numeric((df_houses['ob-sqft'].replace('[\,]', '', regex=True)),
+                                               errors='coerce')
+
+        # lot-size
+        # input - 1,000 sqft
+        #       - 1 acres
+        # output - 1000
+        #        - 43560
+        # do it in two steps:
+        # 1. convert acres
+        # 2. convert sqft
+
+        # choose rows that contains acres
+        # convert to numeric and to sqft by multiplying 43560
+        df_houses.loc[df_houses['lot-size'].str.contains("acres", na=1), 'lot-size'] = \
+            pd.to_numeric((df_houses['lot-size'].replace('[\, acres]', '', regex=True)), errors='coerce') * 43560
+
+        # convert to numeric values, rows that contains sqft
+        df_houses['lot-size'] = pd.to_numeric((df_houses['lot-size'].replace('[\, sqft]', '', regex=True)),
+                                                errors='coerce')
+
+        return df_houses
+
+    @staticmethod
+    def _fill_missed_values(df_houses):
+        # most single family houses have 1 or 2 stories, and their proportion is about equal
+        # so NaN stories replace for 1 or 2 in random maner
+        df_houses['ob-stories'] = df_houses['ob-stories'].fillna(
+            pd.Series(np.random.choice([1, 2], size=len(df_houses.index))))
+
+        median_columns = ['fin-price', 'ob-beds', 'ob-bath', 'ob-sqft', 'lot-size']
+        for col in median_columns:
+            df_houses[col] = df_houses[col].fillna(df_houses[col].median())
+
+        return df_houses
+
+    @staticmethod
+    def _create_custom_features(df_houses):
+        df_houses.loc[df_houses['ob-type-3'].eq('Townhouse'), 'ob-type'] = 1
+        df_houses.loc[df_houses['ob-type-4'].eq('Multi Family'), 'ob-type'] = 2
+        df_houses.loc[df_houses['ob-type-1'].eq('Single Family Home'), 'ob-type'] = 3
+
+        return df_houses
+
+    @staticmethod
+    def _get_short_df(df_houses):
+
+        df_houses_short = df_houses[['dist-city', 'dist-name', 'fin-price', 'ob-type', 'ob-beds', 'ob-bath', 'ob-sqft', 'lot-size']]
+        return df_houses_short
+
+    @staticmethod
+    def _define_correlations(df_houses_short):
+        corr_matrix = df_houses_short.corr()
+        print(corr_matrix['fin-price'].sort_values(ascending=False))
 
     @staticmethod
     def _convert_text_value_to_numbers(original_df):
