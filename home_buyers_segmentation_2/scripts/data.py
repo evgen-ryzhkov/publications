@@ -45,22 +45,18 @@ class Data:
         df_cleaned = self._clean_data(df_city_loaded)
 
         # feature engineering
-        df_feature_processed = self._convert_text_data(df_cleaned)
+        df_chosen_features = self._choose_features(df_cleaned)
+        df_feature_processed = self._convert_text_data(df_chosen_features)
         df_feature_processed = self._fill_missed_values(df_feature_processed)
 
         df_normalized = self._get_normalized_df(df_feature_processed)
 
-
-        self._familiarity_with_data(df_feature_processed)
-        self._familiarity_with_data(df_normalized)
+        # self._familiarity_with_data(df_chosen_features)
+        # self._familiarity_with_data(df_normalized)
 
         # customer segmentation --------------------
-
-        # original_df, normalized_df = self._prepare_data(df_city_loaded)
-        # self._familiarity_with_data(original_df)
-        # self._define_correlations(original_df)
-        # segmented_df = get_segments(original_df, normalized_df)
-        # analyse_segments(original_df, normalized_df, segmented_df)
+        segmented_df = get_segments(df_cleaned, df_normalized)
+        analyse_segments(df_cleaned, df_normalized, segmented_df)
 
     @staticmethod
     def _load_csv_data():
@@ -91,12 +87,14 @@ class Data:
         # print(dataset.head())
         # print(dataset.info())
         #
-        # print(dataset['fin_price'])
-        pd.set_option('display.float_format', lambda x: '%.1f' % x)
-        print(dataset['fin_price'].describe())
+        # temp = dataset.loc[~dataset['plot_size'].str.contains('m²', na = False)]
+        # print(temp['plot_size'].unique())
+        # print(dataset['plot_size']) # ob_bath_num, ob_ext_storage, ob_stories, ob_vol_cub, plot_size
+        # pd.set_option('display.float_format', lambda x: '%.1f' % x)
+        print(dataset['ob_stories'].describe())
 
         # what's columns and type of data
-        # print(dataset.shape)
+        print(dataset.shape)
 
         # familiarity with particular column
         # pd.set_option('display.float_format', lambda x: '%.1f' % x)
@@ -117,11 +115,30 @@ class Data:
         # drop error instances
         df_cleaned = df_cleaned.loc[(pd.notnull(df_cleaned['fin_price']) & pd.notnull(df_cleaned['fin_term']))]
 
+        # drop rudiment columns
+        df_cleaned = df_cleaned.drop(columns=['web-scraper-order', 'web-scraper-start-url', 'house-link', 'house-link-href'])
+
         return df_cleaned
+
+    @staticmethod
+    def _choose_features(df):
+        df_chosen_features = df.copy()
+        df_chosen_features = df_chosen_features[['fin_price', 'ob_living_area', 'ob_room_num', 'ob_other_space_inside', 'ob_ext_storage',
+                                  'ob_vol_cub', 'plot_size', 'ob_stories']]
+        return df_chosen_features
 
     @staticmethod
     def _convert_text_data(df):
         df['fin_price'] = pd.to_numeric(df['fin_price'].str.replace('[^0-9]', ''))
+        df['ob_living_area'] = pd.to_numeric(df['ob_living_area'].str.replace('[^0-9]', ''))
+        df['ob_room_num'] = pd.to_numeric(df['ob_room_num'].str[0:2].replace('[^0-9]', ''))
+        df['ob_other_space_inside'] = pd.to_numeric(df['ob_other_space_inside'].str.replace('[^0-9]', ''))
+        df['ob_ext_storage'] = pd.to_numeric(df['ob_ext_storage'].str.replace('[^0-9]', ''))
+        df['ob_vol_cub'] = pd.to_numeric(df['ob_vol_cub'].str.replace('[^0-9]', ''))
+        df['plot_size'] = pd.to_numeric(df['plot_size'].str.replace('[^0-9]', ''))
+
+        # TODO it needs to get attic / loft features
+        df['ob_stories'] = pd.to_numeric(df['ob_stories'].str[0:2].replace('[^0-9]', ''))
 
         return df
 
@@ -146,21 +163,22 @@ class Data:
     def _fill_missed_values(df):
 
         # for part of data just insert median value
-        median_columns = ['fin_price']
+        median_columns = ['fin_price', 'ob_living_area', 'ob_room_num', 'ob_vol_cub', 'plot_size']
         for col in median_columns:
             df[col] = df[col].fillna(df[col].median())
 
+        # if NaN it means there isn't other space there
+        # TODO perhaps it isn't good idia with 0.0001
+        # perhaps it would be better if convert this space into categorical data (None, Small, Normal, Big)
+        df['ob_other_space_inside'] = df['ob_other_space_inside'].fillna(0.0001)
+        df['ob_ext_storage'] = df['ob_ext_storage'].fillna(0.0001)
 
-        # most single family houses have 1 or 2 stories, and their proportion is about equal
-        # so NaN stories replace for 1 or 2 in random maner
-        # df['Car'] = df['Car'].fillna(
-        #     pd.Series(np.random.choice([0, 1, 2], size=len(df.index))))
-        #
-        # df_bed_0 = df.loc[df['Bedroom2'] == 0]
-        # df['Bedroom2'] = pd.Series(np.random.choice([1, 2, 3], size=len(df_bed_0.index)))
-        # df['Bedroom2'] = df['Bedroom2'].fillna(
-        #     pd.Series(np.random.choice([1, 2], size=len(df.index))))
-        #
+        # most properties have 1, 2 or 3 stories
+        # so NaN stories replace for 1 or 2 or 3 in random maner
+        mask_nan = df['ob_stories'].isnull()
+        l = mask_nan.sum()
+        s = np.random.choice([1, 2, 3], size=l)
+        df.loc[mask_nan, 'ob_stories'] = s
 
         return df
 
@@ -186,7 +204,8 @@ class Data:
             - scale data
         '''
 
-        necessary_columns = ['fin_price']
+        necessary_columns = ['fin_price', 'ob_living_area', 'ob_room_num', 'ob_other_space_inside', 'ob_ext_storage',
+                             'ob_stories', 'ob_vol_cub', 'plot_size']
         normalized_df = original_df.copy()
         min_max_scaler = MinMaxScaler()
 
@@ -194,7 +213,8 @@ class Data:
             # Transform Skewed Data
             normalized_df[col] = np.log(normalized_df[col])
 
-            # normalize data
+            # scale data
+            # min max scaler because there are outliers in dataset
             try:
                 normalized_df[[col]] = min_max_scaler.fit_transform(normalized_df[[col]])
             except:

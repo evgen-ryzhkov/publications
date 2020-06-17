@@ -41,7 +41,7 @@ def _define_number_of_segments(df_normalized):
     # plt.title('The Elbow Method using Inertia')
     # plt.show()
 
-    optimal_segments_number = 3
+    optimal_segments_number = 6
     return optimal_segments_number
 
 
