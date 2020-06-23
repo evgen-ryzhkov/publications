@@ -37,9 +37,28 @@ class Data:
         # load data
         # df_city_loaded = self._load_csv_data()
         df_city_loaded = self._get_test_data()
+        df_original = df_city_loaded
 
+
+        # 1. get property segments
+        # - 1.1. data preprocessing
+        # - 1.2. property segmentation
+        # 2. get price segments
+        # 3. get place segments
+        # 4. get overall segments
+
+        # 1. get property segments
+        # 1.1. data preprocessing
+        df_prop_preprpocessed = self._preprocess_property_data(df_original)
+
+        # df_prop_segmented = get_segments(df_original, df_prop_preprpocessed)
+        # analyse_segments(df_original, df_prop_preprpocessed, df_prop_segmented)
+
+
+
+        # ------------------------------------------------------
         # house feature analysis
-        self._familiarity_with_data(df_city_loaded)
+        # self._familiarity_with_data(df_prop_segmented)
 
         # data preprocessing -----------------------
         # df_numeric = self._convert_text_data(df_city_loaded)
@@ -89,7 +108,7 @@ class Data:
 
     @staticmethod
     def _get_test_data():
-        test_data_size = 15
+        test_data_size = 5000
 
         price_grade = [2, 5, 10, 20]
         price_arr = np.random.choice(price_grade, size=test_data_size)
@@ -104,9 +123,9 @@ class Data:
         prop_size = ['S', 'M', 'L']
         prop_complectation = ['Poor', 'Normal', 'Good', 'Excellent']
 
-        prop_type_arr = np.random.choice(prop_type, size=test_data_size)
-        prop_size_arr = np.random.choice(prop_size, size=test_data_size)
-        prop_complectation_arr = np.random.choice(prop_complectation, size=test_data_size)
+        prop_type_arr = np.random.choice(prop_type, size=test_data_size, p=[0.3, 0.5, 0.1, 0.1])
+        prop_size_arr = np.random.choice(prop_size, size=test_data_size, p=[0.2, 0.6, 0.2])
+        prop_complectation_arr = np.random.choice(prop_complectation, size=test_data_size, p=[0.1, 0.3, 0.4, 0.2])
 
         prop_dic = {
             'prop_type': prop_type_arr,
@@ -115,16 +134,19 @@ class Data:
         }
 
         df_original = pd.DataFrame(data=prop_dic)
-        print('Original \n', df_original)
 
+        return df_original
+
+    def _preprocess_property_data(self, df_original):
         # 2. preprocesing data for df property
         # 2.1. property type
         encoder_1hot = OneHotEncoder()
         df_prop_type_1hot = pd.DataFrame(
-            encoder_1hot.fit_transform(df_original[['prop_type']])\
-            .toarray(),
+            encoder_1hot.fit_transform(df_original[['prop_type']]) \
+                .toarray(),
             columns=['Apartment', 'Detached_House', 'Semi_detached house', 'Townhouse']
         )
+        # order of columns you can get by print(df_prop_type_1hot.categories_)
 
         # 2.2. property_size
         encoder_ordinal_size = OrdinalEncoder(categories=[['S', 'M', 'L']])
@@ -140,30 +162,23 @@ class Data:
             columns=['prop_complectation']
         )
 
-        # 2.4. get preprocessed df
-        df_preprocessed = pd.concat(
+        # 2.4. get merged df
+        df_encode_merged = pd.concat(
             [df_prop_type_1hot, df_prop_size_encoded, df_prop_complectation_encoded],
             axis=1, sort=False)
 
+        # 2.5 scale data
+        df_scaled = self._get_normalized_df(df_encode_merged)
 
-        print(df_preprocessed)
-
-        # data_dic = {
-        #     'price_segment': price_arr,
-        #     'property_type_segment': property_type_arr
-        # }
-        # df = pd.DataFrame(data=data_dic)
-
-
-        return df
+        return df_scaled
 
     @staticmethod
     def _familiarity_with_data(dataset):
 
         # what's size and fullness datas
         # print('Dataset size', dataset.shape)
-        print(dataset.head())
-        # print(dataset.info())
+        # print(dataset.head())
+        print(dataset.info())
         #
         # temp = dataset.loc[~dataset['plot_size'].str.contains('m²', na = False)]
         # print(temp['plot_size'].unique())
@@ -202,7 +217,9 @@ class Data:
         # familiarity with particular column
         # pd.set_option('display.float_format', lambda x: '%.1f' % x)
         # print(dataset['Type'].describe())
-        # dataset.hist(column='Type')
+        # dataset.hist(column='prop_size')
+        # plt.show()
+        # dataset.hist(column='prop_complectation')
         # plt.show()
 
         # print(dataset.loc[dataset['Car'].isnull()]['Type'])
@@ -304,7 +321,7 @@ class Data:
 
         for col in necessary_columns:
             # Transform Skewed Data
-            normalized_df[col] = np.log(normalized_df[col])
+            # normalized_df[col] = np.log(normalized_df[col])
 
             # scale data
             # min max scaler because there are outliers in dataset

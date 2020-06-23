@@ -9,7 +9,7 @@ def analyse_segments(df_original, df_normalized, df_segmented):
 
     _profile_clusters(df_segmented, df_stat)
 
-    _show_snake_plot(df_original, df_normalized, df_segmented)
+    # _show_snake_plot(df_original, df_normalized, df_segmented)
 
 
 def _validate_cluster_sizes(df_segmented):
@@ -36,17 +36,23 @@ def _validate_cluster_sizes(df_segmented):
 def _profile_clusters(df_segmented, df_stat):
 
     # explore median values
-    median_columns = ['prop_size', 'prop_complectation']
+    # median_columns = ['prop_size', 'prop_complectation']
 
-    df_profile = round(df_segmented.groupby('Cluster')[median_columns].median()).astype(int)
-    df_merged = pd.concat([df_stat, df_profile], axis=1)
+    # df_profile = round(df_segmented.groupby('Cluster')[median_columns].median()).astype(int)
+    # df_merged = pd.concat([df_stat, df_profile], axis=1)
 
-    print(df_merged.sort_values(by=[0], ascending=False))
+    # print(df_merged.sort_values(by=[0], ascending=False))
 
     # detail explore features
     # pd.set_option('display.float_format', lambda x: '%.0f' % x)
-    # print(df_segmented.groupby('Cluster')['price_segment'].describe())
-    # print(df_segmented.groupby('Cluster')['property_type_segment'].describe())
+    # print(df_segmented.groupby('Cluster')['prop_type'].describe())
+
+    # create profiling table
+    print('Cluster 4 ----------------')
+
+    print(df_segmented.groupby('Cluster'))
+    # print(df_cluster_profile.astype('object').describe().transpose())
+
 
 
 
@@ -62,13 +68,13 @@ def _show_snake_plot(df_original, df_normalized, df_segmented):
     # Melt data into long format
     df_melt = pd.melt(df_normalized.reset_index(),
                       id_vars=['Cluster'],
-                      value_vars=['prop_type_1hot', 'prop_size', 'prop_complectation'],
+                      value_vars=['Apartment', 'Detached_House', 'Semi_detached house', 'Townhouse', 'prop_size', 'prop_complectation'],
                       var_name='Metric',
                       value_name='Value')
 
     # fig, ax = plt.subplots()
 
-    plt.figure(figsize=(30, 6))
+    plt.figure(figsize=(20, 6))
     # fig.set_size_inches(30, 6)
     plt.xlabel('Metric')
     plt.ylabel('Value')
