@@ -51,8 +51,8 @@ class Data:
         # 1.1. data preprocessing
         df_prop_preprpocessed = self._preprocess_property_data(df_original)
 
-        # df_prop_segmented = get_segments(df_original, df_prop_preprpocessed)
-        # analyse_segments(df_original, df_prop_preprpocessed, df_prop_segmented)
+        df_prop_segmented = get_segments(df_original, df_prop_preprpocessed)
+        analyse_segments(df_original, df_prop_preprpocessed, df_prop_segmented)
 
 
 
