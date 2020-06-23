@@ -53,100 +53,47 @@ def _profile_clusters(df_segmented, df_stat):
     # detail profiling
 
     # create profiling table
+    property_types = ['Apartment', 'Townhouse', 'Semi_detached house', 'Detached_House']
+    size_types = ['S', 'M', 'L']
+    complectation_types = ['Poor', 'Normal', 'Good', 'Excellent']
+
+    df_profiling_cols = property_types + size_types + complectation_types
+
+    # initiation of df_profiling
     n_clusters = 5
-    df_profiling_cols = [
-        'Apartment', 'Townhouse', 'Semi_detached house', 'Detached_House',
-        'S', 'M', 'L',
-        'Poor', 'Normal', 'Good', 'Excellent'
-        ]
+    n_columns = len(df_profiling_cols)
+    init_array = np.zeros((n_clusters, n_columns))
+    df_profiling = pd.DataFrame(data=init_array, columns=df_profiling_cols)
 
-    apartment_percents_arr = []
-    townhouse_percents_arr = []
-    semi_detached_percents_arr = []
-    detached_percents_arr = []
-    size_s_percents_arr = []
-    size_m_percents_arr = []
-    size_l_percents_arr = []
-    compl_poor_percents_arr = []
-    compl_norm_percents_arr = []
-    compl_good_percents_arr = []
-    compl_exc_percents_arr = []
+    # fill df_profiling with real values
+    # value - percents each type of features in cluster
     for cluster in range(n_clusters):
-
         df_cluster = df_segmented.loc[df_segmented['Cluster'] == cluster]
         df_cluster_len = len(df_cluster)
 
-        percent_val = round((len(df_cluster.loc[df_cluster['prop_type'] == 'Apartment']) / df_cluster_len) * 100)
-        apartment_percents_arr.append(percent_val)
+        for col in df_profiling_cols:
 
-        percent_val = round((len(df_cluster.loc[df_cluster['prop_type'] == 'Townhouse']) / df_cluster_len) * 100)
-        townhouse_percents_arr.append(percent_val)
+            # there are different columns in original df
+            # for different profiling columns
+            # for example: columnn prop_size in df_original
+            # transforms into three columns S, M, L in df_profiling
+            df_col_name = ''
+            if col in property_types:
+                df_col_name = 'prop_type'
+            elif col in size_types:
+                df_col_name = 'prop_size'
+            elif col in complectation_types:
+                df_col_name = 'prop_complectation'
 
-        percent_val = round((len(df_cluster.loc[df_cluster['prop_type'] == 'Semi_detached house']) / df_cluster_len) * 100)
-        semi_detached_percents_arr.append(percent_val)
+            percent_val = round((len(df_cluster.loc[df_cluster[df_col_name] == col]) / df_cluster_len) * 100)
+            df_profiling.loc[cluster, col] = percent_val
 
-        percent_val = round((len(df_cluster.loc[df_cluster['prop_type'] == 'Detached_House']) / df_cluster_len) * 100)
-        detached_percents_arr.append(percent_val)
-
-        percent_val = round((len(df_cluster.loc[df_cluster['prop_size'] == 'S']) / df_cluster_len) * 100)
-        size_s_percents_arr.append(percent_val)
-
-        percent_val = round((len(df_cluster.loc[df_cluster['prop_size'] == 'M']) / df_cluster_len) * 100)
-        size_m_percents_arr.append(percent_val)
-
-        percent_val = round((len(df_cluster.loc[df_cluster['prop_size'] == 'L']) / df_cluster_len) * 100)
-        size_l_percents_arr.append(percent_val)
-
-        percent_val = round((len(df_cluster.loc[df_cluster['prop_complectation'] == 'Poor']) / df_cluster_len) * 100)
-        compl_poor_percents_arr.append(percent_val)
-
-        percent_val = round((len(df_cluster.loc[df_cluster['prop_complectation'] == 'Normal']) / df_cluster_len) * 100)
-        compl_norm_percents_arr.append(percent_val)
-
-        percent_val = round((len(df_cluster.loc[df_cluster['prop_complectation'] == 'Good']) / df_cluster_len) * 100)
-        compl_good_percents_arr.append(percent_val)
-
-        percent_val = round((len(df_cluster.loc[df_cluster['prop_complectation'] == 'Excellent']) / df_cluster_len) * 100)
-        compl_exc_percents_arr.append(percent_val)
-
-    # for col in df_profiling_cols:
-    #
-    #     for cluster in range(n_clusters):
-    #
-    #
-    #         df_cluster_len = len(df_cluster)
-    #
-    #         df_cluster_col_len = df_cluster.loc[df_cluster[]]
-    #         col_percent =
-    #
-    #         df_profiling[cluster][col] = 1
-    profile_dic = {
-        'Flat': apartment_percents_arr,
-        'Townhouse': townhouse_percents_arr,
-        'S detached house': semi_detached_percents_arr,
-        'Detached_House': detached_percents_arr,
-        'S': size_s_percents_arr,
-        'M': size_m_percents_arr,
-        'L': size_l_percents_arr,
-        'Poor': compl_poor_percents_arr,
-        'Normal': compl_norm_percents_arr,
-        'Good': compl_good_percents_arr,
-        'Excellent': compl_exc_percents_arr
-
-    }
-
-    df_profiling = pd.DataFrame(data=profile_dic)
+    # add distribution values for each cluster
     df_profiling = pd.concat([df_stat, df_profiling], axis=1, sort=False)
     print(df_profiling)
 
-    heat_map = sns.heatmap(df_profiling, annot=True)
+    sns.heatmap(df_profiling, annot=True)
     plt.show()
-
-    # print(df_segmented.groupby('Cluster'))
-    # print(df_cluster_profile.astype('object').describe().transpose())
-
-
-
 
 
 def _show_snake_plot(df_original, df_normalized, df_segmented):
