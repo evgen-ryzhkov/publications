@@ -32,8 +32,8 @@ def _define_number_of_segments(df_normalized):
     #     inertia[n]=model.inertia_
     #     inertia_values.append(model.inertia_)
     #
-    # for key, val in inertia.items():
-    #     print(str(key) + ' : ' + str(val))
+    # # for key, val in inertia.items():
+    # #     print(str(key) + ' : ' + str(val))
     #
     # plt.plot(n_clusters, inertia_values, 'bx-')
     # plt.xlabel('Values of K')
@@ -41,7 +41,7 @@ def _define_number_of_segments(df_normalized):
     # plt.title('The Elbow Method using Inertia')
     # plt.show()
 
-    optimal_segments_number = 6
+    optimal_segments_number = 5
     return optimal_segments_number
 
 

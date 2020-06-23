@@ -24,7 +24,7 @@ import os
 import numpy as np
 import pandas as pd
 import glob
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler, OneHotEncoder, OrdinalEncoder
 import matplotlib.pyplot as plt
 import random
 import re
@@ -35,28 +35,36 @@ class Data:
     def run(self):
 
         # load data
-        df_city_loaded = self._load_csv_data()
+        # df_city_loaded = self._load_csv_data()
+        df_city_loaded = self._get_test_data()
 
         # house feature analysis
-        # self._familiarity_with_data(df_city_loaded)
+        self._familiarity_with_data(df_city_loaded)
 
         # data preprocessing -----------------------
+        # df_numeric = self._convert_text_data(df_city_loaded)
+
         # data cleaning
-        df_cleaned = self._clean_data(df_city_loaded)
+        # df_cleaned = self._clean_data(df_numeric)
 
         # feature engineering
-        df_chosen_features = self._choose_features(df_cleaned)
-        df_feature_processed = self._convert_text_data(df_chosen_features)
-        df_feature_processed = self._fill_missed_values(df_feature_processed)
 
-        df_normalized = self._get_normalized_df(df_feature_processed)
+        # df_feature_processed = self._fill_missed_values(df_cleaned)
 
-        # self._familiarity_with_data(df_chosen_features)
+        # choose feature for segmentation
+        # df_chosen_features = self._choose_features(df_feature_processed)
+        # df_chosen_features = self._choose_features(df_city_loaded)
+        #
+        # df_normalized = self._get_normalized_df(df_chosen_features)
+
+        # self._familiarity_with_data(df_feature_processed)
         # self._familiarity_with_data(df_normalized)
 
         # customer segmentation --------------------
-        segmented_df = get_segments(df_cleaned, df_normalized)
-        analyse_segments(df_cleaned, df_normalized, segmented_df)
+        # segmented_df = get_segments(df_cleaned, df_normalized)
+        # segmented_df = get_segments(df_city_loaded, df_normalized)
+        # analyse_segments(df_cleaned, df_normalized, segmented_df)
+        # analyse_segments(df_city_loaded, df_normalized, segmented_df)
 
     @staticmethod
     def _load_csv_data():
@@ -80,21 +88,116 @@ class Data:
             raise ValueError('Something wrong with CSV file operation!')
 
     @staticmethod
+    def _get_test_data():
+        test_data_size = 15
+
+        price_grade = [2, 5, 10, 20]
+        price_arr = np.random.choice(price_grade, size=test_data_size)
+
+        # Property  ---------------------------------------
+        # 1. create original df property
+        # 2. preprocesing data for df property
+        # 3. get df property segmented
+
+        # 1. create original df property
+        prop_type = ['Apartment', 'Townhouse', 'Semi_detached house', 'Detached_House']
+        prop_size = ['S', 'M', 'L']
+        prop_complectation = ['Poor', 'Normal', 'Good', 'Excellent']
+
+        prop_type_arr = np.random.choice(prop_type, size=test_data_size)
+        prop_size_arr = np.random.choice(prop_size, size=test_data_size)
+        prop_complectation_arr = np.random.choice(prop_complectation, size=test_data_size)
+
+        prop_dic = {
+            'prop_type': prop_type_arr,
+            'prop_size': prop_size_arr,
+            'prop_complectation': prop_complectation_arr
+        }
+
+        df_original = pd.DataFrame(data=prop_dic)
+        print('Original \n', df_original)
+
+        # 2. preprocesing data for df property
+        # 2.1. property type
+        encoder_1hot = OneHotEncoder()
+        df_prop_type_1hot = pd.DataFrame(
+            encoder_1hot.fit_transform(df_original[['prop_type']])\
+            .toarray(),
+            columns=['Apartment', 'Detached_House', 'Semi_detached house', 'Townhouse']
+        )
+
+        # 2.2. property_size
+        encoder_ordinal_size = OrdinalEncoder(categories=[['S', 'M', 'L']])
+        df_prop_size_encoded = pd.DataFrame.from_records(
+            encoder_ordinal_size.fit_transform(df_original[['prop_size']].values.reshape(-1, 1)),
+            columns=['prop_size']
+        )
+
+        # 2.3. property_complectation
+        encoder_ordinal_complectation = OrdinalEncoder(categories=[['Poor', 'Normal', 'Good', 'Excellent']])
+        df_prop_complectation_encoded = pd.DataFrame.from_records(
+            encoder_ordinal_complectation.fit_transform(df_original[['prop_complectation']].values.reshape(-1, 1)),
+            columns=['prop_complectation']
+        )
+
+        # 2.4. get preprocessed df
+        df_preprocessed = pd.concat(
+            [df_prop_type_1hot, df_prop_size_encoded, df_prop_complectation_encoded],
+            axis=1, sort=False)
+
+
+        print(df_preprocessed)
+
+        # data_dic = {
+        #     'price_segment': price_arr,
+        #     'property_type_segment': property_type_arr
+        # }
+        # df = pd.DataFrame(data=data_dic)
+
+
+        return df
+
+    @staticmethod
     def _familiarity_with_data(dataset):
 
         # what's size and fullness datas
         # print('Dataset size', dataset.shape)
-        # print(dataset.head())
+        print(dataset.head())
         # print(dataset.info())
         #
         # temp = dataset.loc[~dataset['plot_size'].str.contains('m²', na = False)]
         # print(temp['plot_size'].unique())
         # print(dataset['plot_size']) # ob_bath_num, ob_ext_storage, ob_stories, ob_vol_cub, plot_size
-        # pd.set_option('display.float_format', lambda x: '%.1f' % x)
-        print(dataset['ob_stories'].describe())
+        # pd.set_option('display.float_format', lambda x: '%.0f' % x)
+        #
+
+        # print(dataset['prop_type_1hot'].unique())
+        # cols = ['fin_price', 'ob_living_area', 'plot_size']
+        #
+        # print('price to 450 000 ============================')
+        # fin_df = dataset.loc[dataset['fin_price']<=450000]
+        # for col in cols:
+        #     print(col + '---------------')
+        #     print(fin_df[col].describe())
+        #
+        # print('price to 1 000 000 ============================')
+        # fin_df = dataset.loc[(dataset['fin_price'] > 450000) & (dataset['fin_price'] <= 1000000)]
+        # for col in cols:
+        #     print(col + '---------------')
+        #     print(fin_df[col].describe())
+        #
+        # print('price more 1 000 000 ============================')
+        # fin_df = dataset.loc[dataset['fin_price'] > 1000000]
+        # for col in cols:
+        #     print(col + '---------------')
+        #     print(fin_df[col].describe())
+
+        # print('Neigborhoods:', dataset.groupby(['city', 'neighborhood']).apply(list))
+        # temp = dataset[['city', 'neighborhood']].drop_duplicates()
+        # print(temp[['city', 'neighborhood']])
 
         # what's columns and type of data
-        print(dataset.shape)
+        # print(dataset.shape)
 
         # familiarity with particular column
         # pd.set_option('display.float_format', lambda x: '%.1f' % x)
@@ -118,13 +221,15 @@ class Data:
         # drop rudiment columns
         df_cleaned = df_cleaned.drop(columns=['web-scraper-order', 'web-scraper-start-url', 'house-link', 'house-link-href'])
 
+        # drop price anomalies
+        # df_cleaned = df_cleaned.loc[df_cleaned['fin_price']<700000]
+
         return df_cleaned
 
     @staticmethod
     def _choose_features(df):
         df_chosen_features = df.copy()
-        df_chosen_features = df_chosen_features[['fin_price', 'ob_living_area', 'ob_room_num', 'ob_other_space_inside', 'ob_ext_storage',
-                                  'ob_vol_cub', 'plot_size', 'ob_stories']]
+        df_chosen_features = df_chosen_features[['prop_type_1hot', 'prop_size', 'prop_complectation']]
         return df_chosen_features
 
     @staticmethod
@@ -141,17 +246,6 @@ class Data:
         df['ob_stories'] = pd.to_numeric(df['ob_stories'].str[0:2].replace('[^0-9]', ''))
 
         return df
-
-    @staticmethod
-    def _prepare_data(self, dataset):
-
-        original_df = self._get_houses(dataset)
-        original_df = self._convert_text_values(original_df)
-        original_df = self._get_short_df(original_df)
-        original_df = self._fill_missed_values(original_df)
-        normalized_df = self._get_normalized_df(original_df)
-        return original_df, normalized_df
-
 
     @staticmethod
     def _get_short_df(df_houses):
@@ -204,8 +298,7 @@ class Data:
             - scale data
         '''
 
-        necessary_columns = ['fin_price', 'ob_living_area', 'ob_room_num', 'ob_other_space_inside', 'ob_ext_storage',
-                             'ob_stories', 'ob_vol_cub', 'plot_size']
+        necessary_columns = ['prop_size', 'prop_complectation']
         normalized_df = original_df.copy()
         min_max_scaler = MinMaxScaler()
 
