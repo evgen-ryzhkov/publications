@@ -43,16 +43,24 @@ class Data:
         # 1. get property segments
         # - 1.1. data preprocessing
         # - 1.2. property segmentation
+        # - 1.3. get property segmented df
         # 2. get price segments
+        # - 2.1. data preprocessing
+        # - 2.2. price segmentation
+        # - 2.3. get price segmented df
         # 3. get place segments
         # 4. get overall segments
+        # 4.1. merge part segmentation
+        # 4.2. overall segmentation
 
         # 1. get property segments
         # 1.1. data preprocessing
         df_prop_preprpocessed = self._preprocess_property_data(df_original)
 
-        df_prop_segmented = get_segments(df_original, df_prop_preprpocessed)
-        analyse_segments(df_original, df_prop_preprpocessed, df_prop_segmented)
+        property_cluster_column_name = 'cluster_property'
+        property_num_clusters = 5
+        df_original_prop_segmented = get_segments(df_original, df_prop_preprpocessed, property_cluster_column_name, property_num_clusters)
+        analyse_segments(df_original, df_prop_preprpocessed, df_original_prop_segmented, property_cluster_column_name)
 
 
 
@@ -110,15 +118,10 @@ class Data:
     def _get_test_data():
         test_data_size = 5000
 
-        price_grade = [2, 5, 10, 20]
-        price_arr = np.random.choice(price_grade, size=test_data_size)
+        # Price -------------------------------------------
+        price_arr = np.random.randint(80000, 3500000, size=test_data_size)
 
         # Property  ---------------------------------------
-        # 1. create original df property
-        # 2. preprocesing data for df property
-        # 3. get df property segmented
-
-        # 1. create original df property
         prop_type = ['Apartment', 'Townhouse', 'Semi_detached house', 'Detached_House']
         prop_size = ['S', 'M', 'L']
         prop_complectation = ['Poor', 'Normal', 'Good', 'Excellent']
@@ -127,12 +130,13 @@ class Data:
         prop_size_arr = np.random.choice(prop_size, size=test_data_size, p=[0.2, 0.6, 0.2])
         prop_complectation_arr = np.random.choice(prop_complectation, size=test_data_size, p=[0.1, 0.3, 0.4, 0.2])
 
+        # Creating overall original df --------------------
         prop_dic = {
+            'price': price_arr,
             'prop_type': prop_type_arr,
             'prop_size': prop_size_arr,
             'prop_complectation': prop_complectation_arr
         }
-
         df_original = pd.DataFrame(data=prop_dic)
 
         return df_original
@@ -171,6 +175,14 @@ class Data:
         df_scaled = self._get_normalized_df(df_encode_merged)
 
         return df_scaled
+
+    @staticmethod
+    def _preprocess_price_data(self, df_original):
+        # 1. normalize
+
+
+        # 2. scaling
+        pass
 
     @staticmethod
     def _familiarity_with_data(dataset):

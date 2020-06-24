@@ -4,18 +4,18 @@ import pandas as pd
 import seaborn as sns
 
 
-def analyse_segments(df_original, df_normalized, df_segmented):
+def analyse_segments(df_original, df_normalized, df_segmented, cluster_col_name):
 
-    f_validation, df_stat = _validate_cluster_sizes(df_segmented)
+    f_validation, df_stat = _validate_cluster_sizes(df_segmented, cluster_col_name)
 
-    _profile_clusters(df_segmented, df_stat)
+    _profile_clusters(df_segmented, df_stat, cluster_col_name)
 
     # _show_snake_plot(df_original, df_normalized, df_segmented)
 
 
-def _validate_cluster_sizes(df_segmented):
+def _validate_cluster_sizes(df_segmented, cluster_col_name):
     print('[INFO] Segment sizes validation...')
-    df_stat = round(((df_segmented.groupby('Cluster').size())/len(df_segmented))*100).astype(int)
+    df_stat = round(((df_segmented.groupby(cluster_col_name).size())/len(df_segmented))*100).astype(int)
     print('Cluster distribution, %\n', df_stat)
 
     f_validation = True
@@ -34,7 +34,7 @@ def _validate_cluster_sizes(df_segmented):
     return f_validation, df_stat
 
 
-def _profile_clusters(df_segmented, df_stat):
+def _profile_clusters(df_segmented, df_stat, cluster_col_name):
 
     # explore median values
     # median_columns = ['prop_size', 'prop_complectation']
@@ -48,7 +48,7 @@ def _profile_clusters(df_segmented, df_stat):
     # pd.set_option('display.float_format', lambda x: '%.0f' % x)
 
     # fast / validation profiling
-    print(df_segmented.groupby('Cluster').describe())
+    print(df_segmented.groupby(cluster_col_name).describe())
 
     # detail profiling
 
@@ -68,7 +68,7 @@ def _profile_clusters(df_segmented, df_stat):
     # fill df_profiling with real values
     # value - percents each type of features in cluster
     for cluster in range(n_clusters):
-        df_cluster = df_segmented.loc[df_segmented['Cluster'] == cluster]
+        df_cluster = df_segmented.loc[df_segmented[cluster_col_name] == cluster]
         df_cluster_len = len(df_cluster)
 
         for col in df_profiling_cols:
