@@ -2,15 +2,7 @@ from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 
 
-def get_segments(df_original, df_normalized, cluster_column_name, num_segments):
-    num_clusters = num_segments
-
-    if not num_segments:
-        # hyperparameter tuning
-        _define_number_of_segments(df_normalized)
-        print('[INFO] Set optimal cluster numbers according to the elbow plot')
-        exit()
-
+def get_segments(df_original, df_normalized, cluster_column_name, num_clusters):
     # run model - get clusters
     cluster_labels = _get_clusters(df_normalized, num_clusters)
 
@@ -20,7 +12,7 @@ def get_segments(df_original, df_normalized, cluster_column_name, num_segments):
     return df_original
 
 
-def _define_number_of_segments(df_normalized):
+def get_number_of_segments(df_normalized):
     # get number of segments - elbow method
     n_clusters = range(1, 10)
     inertia = {}
@@ -45,6 +37,8 @@ def _define_number_of_segments(df_normalized):
     plt.title('The Elbow Method using Inertia')
     plt.show()
 
+    print('[INFO] Set number of cluster variable according to the elbow plot')
+    exit()
 
 def _get_clusters(df_normalized, num_clusters):
     kmeans_model = KMeans(n_clusters=num_clusters, random_state=1)

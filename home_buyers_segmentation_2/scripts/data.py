@@ -17,7 +17,7 @@ Usage:
     parse data: python -m scripts.data.py
 
 """
-from .k_means_segmentation import get_segments
+from .k_means_segmentation import get_number_of_segments, get_segments
 from .segments_analysis import analyse_segments
 
 import os
@@ -53,14 +53,23 @@ class Data:
         # 4.1. merge part segmentation
         # 4.2. overall segmentation
 
-        # 1. get property segments
-        # 1.1. data preprocessing
+        # get property segments -----------------------------
         df_prop_preprpocessed = self._preprocess_property_data(df_original)
 
-        property_cluster_column_name = 'cluster_property'
+        # to define number of cluster, run this function
+        # get_number_of_segments(df_prop_preprpocessed)
         property_num_clusters = 5
+        property_cluster_column_name = 'cluster_property'
         df_original_prop_segmented = get_segments(df_original, df_prop_preprpocessed, property_cluster_column_name, property_num_clusters)
-        analyse_segments(df_original, df_prop_preprpocessed, df_original_prop_segmented, property_cluster_column_name)
+
+        # validation analysis property segmentation
+        # for meaningfulness results
+        # analyse_segments(df_original, df_prop_preprpocessed, df_original_prop_segmented, property_cluster_column_name)
+
+        # get price segments --------------------------------
+        price_cluster_column_name = 'cluster_price'
+        df_original_prop_and_price_segmented = self._get_price_segments(df_original_prop_segmented, price_cluster_column_name)
+
 
 
 
@@ -119,7 +128,12 @@ class Data:
         test_data_size = 5000
 
         # Price -------------------------------------------
-        price_arr = np.random.randint(80000, 3500000, size=test_data_size)
+        # price_arr = np.random.randint(80000, 3500000, size=test_data_size)
+        price_val = [80000, 100000, 120000, 150000, 170000, 200000, 220000, 250000, 275000, 300000, 350000, 380000,
+                     400000, 500000, 600000, 750000, 1000000, 1500000, 2000000, 2500000, 3000000]
+        price_prob = [0.01, 0.01, 0.02, 0.1, 0.125, 0.125, 0.125, 0.125, 0.12, 0.1, 0.05, 0.02, 0.02, 0.01, 0.01,
+                      0.01,0.005, 0.005, 0.005, 0.003, 0.002]
+        price_arr = np.random.choice(price_val, size=test_data_size, p=price_prob)
 
         # Property  ---------------------------------------
         prop_type = ['Apartment', 'Townhouse', 'Semi_detached house', 'Detached_House']
@@ -177,12 +191,27 @@ class Data:
         return df_scaled
 
     @staticmethod
-    def _preprocess_price_data(self, df_original):
-        # 1. normalize
+    def _get_price_segments(df_original, cluster_col_name):
+        # visual data analysis
+        # pd.set_option('display.float_format', lambda x: '%.0f' % x)
+        # print(df_original['price'].describe())
+        # df_original.hist(column='price')
+        # plt.show()
 
+        # set manual segments
+        # 0 - 80000 - 170000
+        # 1 - 170001 - 300000
+        # 2 - 300001 - 600000
+        # 3 - 600001 - 1000000
+        # 4 - 1000000 >
+        df_original[cluster_col_name] = df_original['price']
+        df_original.loc[df_original[cluster_col_name]<170001] = 0
+        df_original.loc[(df_original[cluster_col_name]>17000) & (df_original['price']<300001)] = 1
+        df_original.loc[(df_original[cluster_col_name]>300000) & (df_original['price']<600001)] = 2
+        df_original.loc[(df_original[cluster_col_name]>600000) & (df_original['price']<1000001)] = 3
+        df_original.loc[df_original[cluster_col_name] > 1000000] = 4
 
-        # 2. scaling
-        pass
+        return df_original
 
     @staticmethod
     def _familiarity_with_data(dataset):
