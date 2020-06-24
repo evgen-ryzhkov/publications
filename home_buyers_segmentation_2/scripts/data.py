@@ -70,6 +70,17 @@ class Data:
         price_cluster_column_name = 'cluster_price'
         df_original_prop_and_price_segmented = self._get_price_segments(df_original_prop_segmented, price_cluster_column_name)
 
+        # preprocessing for merged segments
+        df_overall_preprocessed = self._preprocess_overall_data(df_original_prop_and_price_segmented,
+                                                                [property_cluster_column_name, price_cluster_column_name])
+
+        # define number of cluster for overall df
+        get_number_of_segments(df_overall_preprocessed)
+        overall_num_clusters = 3
+        overall_cluster_column_name = 'cluster_overall'
+        df_overall_segmented = get_segments(df_original_prop_and_price_segmented, df_overall_preprocessed,
+                                            overall_cluster_column_name, overall_num_clusters)
+
 
 
 
@@ -186,7 +197,8 @@ class Data:
             axis=1, sort=False)
 
         # 2.5 scale data
-        df_scaled = self._get_normalized_df(df_encode_merged)
+        necessary_columns = ['prop_size', 'prop_complectation']
+        df_scaled = self._get_normalized_df(df_encode_merged, necessary_columns)
 
         return df_scaled
 
@@ -205,13 +217,23 @@ class Data:
         # 3 - 600001 - 1000000
         # 4 - 1000000 >
         df_original[cluster_col_name] = df_original['price']
-        df_original.loc[df_original[cluster_col_name]<170001] = 0
-        df_original.loc[(df_original[cluster_col_name]>17000) & (df_original['price']<300001)] = 1
-        df_original.loc[(df_original[cluster_col_name]>300000) & (df_original['price']<600001)] = 2
-        df_original.loc[(df_original[cluster_col_name]>600000) & (df_original['price']<1000001)] = 3
-        df_original.loc[df_original[cluster_col_name] > 1000000] = 4
+        df_original[cluster_col_name].loc[df_original[cluster_col_name]<170001] = 0
+        df_original[cluster_col_name].loc[(df_original[cluster_col_name]>17000) & (df_original[cluster_col_name]<300001)] = 1
+        df_original[cluster_col_name].loc[(df_original[cluster_col_name]>300000) & (df_original[cluster_col_name]<600001)] = 2
+        df_original[cluster_col_name].loc[(df_original[cluster_col_name]>600000) & (df_original[cluster_col_name]<1000001)] = 3
+        df_original[cluster_col_name].loc[df_original[cluster_col_name] > 1000000] = 4
 
         return df_original
+
+    def _preprocess_overall_data(self, df_original, columns_for_segmentation):
+        df_clusters_only = df_original[columns_for_segmentation]
+
+        # scale data
+        necessary_columns = ['cluster_property', 'cluster_price']
+        df_scaled = self._get_normalized_df(df_clusters_only, necessary_columns)
+
+        return df_scaled
+
 
     @staticmethod
     def _familiarity_with_data(dataset):
@@ -349,14 +371,13 @@ class Data:
 
 
     @staticmethod
-    def _get_normalized_df(original_df):
+    def _get_normalized_df(original_df, necessary_columns):
         '''
             pre-processing data for k-mean segmentation:
             - transform skewed data with log tranasformation
             - scale data
         '''
 
-        necessary_columns = ['prop_size', 'prop_complectation']
         normalized_df = original_df.copy()
         min_max_scaler = MinMaxScaler()
 
