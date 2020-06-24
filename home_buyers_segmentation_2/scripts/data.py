@@ -75,13 +75,13 @@ class Data:
                                                                 [property_cluster_column_name, price_cluster_column_name])
 
         # define number of cluster for overall df
-        get_number_of_segments(df_overall_preprocessed)
-        overall_num_clusters = 3
+        # get_number_of_segments(df_overall_preprocessed)
+        overall_num_clusters = 6
         overall_cluster_column_name = 'cluster_overall'
         df_overall_segmented = get_segments(df_original_prop_and_price_segmented, df_overall_preprocessed,
                                             overall_cluster_column_name, overall_num_clusters)
-
-
+        analyse_segments(df_original, df_overall_preprocessed, df_overall_segmented,
+                         overall_cluster_column_name, overall_num_clusters)
 
 
         # ------------------------------------------------------

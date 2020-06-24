@@ -4,11 +4,11 @@ import pandas as pd
 import seaborn as sns
 
 
-def analyse_segments(df_original, df_normalized, df_segmented, cluster_col_name):
+def analyse_segments(df_original, df_normalized, df_segmented, cluster_col_name, n_clusters):
 
     f_validation, df_stat = _validate_cluster_sizes(df_segmented, cluster_col_name)
 
-    _profile_clusters(df_segmented, df_stat, cluster_col_name)
+    _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters)
 
     # _show_snake_plot(df_original, df_normalized, df_segmented)
 
@@ -20,7 +20,7 @@ def _validate_cluster_sizes(df_segmented, cluster_col_name):
 
     f_validation = True
     for i in range(len(df_stat)):
-        if (df_stat[i] < 5) | (df_stat[i] > 40):
+        if (df_stat[i] < 5) | (df_stat[i] > 30):
             print('[Validation Error: There are segments with bad distribution.]')
             f_validation = False
 
@@ -34,7 +34,7 @@ def _validate_cluster_sizes(df_segmented, cluster_col_name):
     return f_validation, df_stat
 
 
-def _profile_clusters(df_segmented, df_stat, cluster_col_name):
+def _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters):
 
     # explore median values
     # median_columns = ['prop_size', 'prop_complectation']
@@ -48,19 +48,20 @@ def _profile_clusters(df_segmented, df_stat, cluster_col_name):
     # pd.set_option('display.float_format', lambda x: '%.0f' % x)
 
     # fast / validation profiling
-    print(df_segmented.groupby(cluster_col_name).describe())
+    # print(df_segmented.groupby(cluster_col_name).head())
 
-    # detail profiling
-
-    # create profiling table
+    # detail profiling -----------------------------------------------------
+    # create profiling table -----------------------------------------------
+    # property profiling
     property_types = ['Apartment', 'Townhouse', 'Semi_detached house', 'Detached_House']
     size_types = ['S', 'M', 'L']
     complectation_types = ['Poor', 'Normal', 'Good', 'Excellent']
+    # price_types = ['>170K', '170-300K', '300-600K', '600K-1M', '1M>']
+    price_types = [0, 1, 2, 3, 4]
 
-    df_profiling_cols = property_types + size_types + complectation_types
+    df_profiling_cols = property_types + size_types + complectation_types + price_types
 
     # initiation of df_profiling
-    n_clusters = 5
     n_columns = len(df_profiling_cols)
     init_array = np.zeros((n_clusters, n_columns))
     df_profiling = pd.DataFrame(data=init_array, columns=df_profiling_cols)
@@ -84,14 +85,31 @@ def _profile_clusters(df_segmented, df_stat, cluster_col_name):
                 df_col_name = 'prop_size'
             elif col in complectation_types:
                 df_col_name = 'prop_complectation'
+            elif col in price_types:
+                df_col_name = 'cluster_price'
 
             percent_val = round((len(df_cluster.loc[df_cluster[df_col_name] == col]) / df_cluster_len) * 100)
             df_profiling.loc[cluster, col] = percent_val
+
+    # rename price columns for better reading
+    df_profiling.rename(columns={
+        0: '>170K',
+        1: '170-300K',
+        2: '300-600K',
+        3: '600K-1M',
+        4: '1M>'
+    }, inplace=True)
 
     # add distribution values for each cluster
     df_profiling = pd.concat([df_stat, df_profiling], axis=1, sort=False)
     print(df_profiling)
 
+    # rename cluster percents for better reading
+    df_profiling.rename(columns={
+        0: 'Cluster %'
+    }, inplace=True)
+
+    plt.figure(figsize=(20, 10))
     sns.heatmap(df_profiling, annot=True)
     plt.show()
 
