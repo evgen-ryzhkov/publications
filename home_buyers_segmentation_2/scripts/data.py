@@ -19,6 +19,7 @@ Usage:
 """
 from .k_means_segmentation import get_number_of_segments, get_segments
 from .segments_analysis import analyse_segments
+from .object_segmentation import get_object_segments
 
 import os
 import numpy as np
@@ -35,8 +36,17 @@ class Data:
     def run(self):
 
         # load data
-        # df_city_loaded = self._load_csv_data()
-        df_city_loaded = self._get_test_data()
+        df_city_loaded = self._load_csv_data()
+
+        # general data cleaning
+        df_original_cleaned = self._clean_data(df_city_loaded)
+
+        df_object_segments = get_object_segments(df_original_cleaned)
+
+
+        # self._familiarity_with_data(df_original_cleaned)
+
+        # df_city_loaded = self._get_test_data()
         df_original = df_city_loaded
 
 
@@ -53,36 +63,38 @@ class Data:
         # 4.1. merge part segmentation
         # 4.2. overall segmentation
 
-        # get property segments -----------------------------
-        df_prop_preprpocessed = self._preprocess_property_data(df_original)
+        # # get property segments -----------------------------
+        # df_prop_preprpocessed = self._preprocess_property_data(df_original)
+        #
+        # # to define number of cluster, run this function
+        # # get_number_of_segments(df_prop_preprpocessed)
+        # property_num_clusters = 5
+        # property_cluster_column_name = 'cluster_property'
+        # df_original_prop_segmented = get_segments(df_original, df_prop_preprpocessed, property_cluster_column_name, property_num_clusters)
+        #
+        # # validation analysis property segmentation
+        # # for meaningfulness results
+        # # analyse_segments(df_original, df_prop_preprpocessed, df_original_prop_segmented, property_cluster_column_name)
+        #
+        # # get price segments --------------------------------
+        # price_cluster_column_name = 'cluster_price'
+        # df_original_prop_and_price_segmented = self._get_price_segments(df_original_prop_segmented, price_cluster_column_name)
+        #
+        # # preprocessing for merged segments
+        # df_overall_preprocessed = self._preprocess_overall_data(df_original_prop_and_price_segmented,
+        #                                                         [property_cluster_column_name, price_cluster_column_name])
+        #
+        # # define number of cluster for overall df
+        # # get_number_of_segments(df_overall_preprocessed)
+        # overall_num_clusters = 6
+        # overall_cluster_column_name = 'cluster_overall'
+        # df_overall_segmented = get_segments(df_original_prop_and_price_segmented, df_overall_preprocessed,
+        #                                     overall_cluster_column_name, overall_num_clusters)
+        # analyse_segments(df_original, df_overall_preprocessed, df_overall_segmented,
+        #                  overall_cluster_column_name, overall_num_clusters)
 
-        # to define number of cluster, run this function
-        # get_number_of_segments(df_prop_preprpocessed)
-        property_num_clusters = 5
-        property_cluster_column_name = 'cluster_property'
-        df_original_prop_segmented = get_segments(df_original, df_prop_preprpocessed, property_cluster_column_name, property_num_clusters)
-
-        # validation analysis property segmentation
-        # for meaningfulness results
-        # analyse_segments(df_original, df_prop_preprpocessed, df_original_prop_segmented, property_cluster_column_name)
-
-        # get price segments --------------------------------
-        price_cluster_column_name = 'cluster_price'
-        df_original_prop_and_price_segmented = self._get_price_segments(df_original_prop_segmented, price_cluster_column_name)
-
-        # preprocessing for merged segments
-        df_overall_preprocessed = self._preprocess_overall_data(df_original_prop_and_price_segmented,
-                                                                [property_cluster_column_name, price_cluster_column_name])
-
-        # define number of cluster for overall df
-        # get_number_of_segments(df_overall_preprocessed)
-        overall_num_clusters = 6
-        overall_cluster_column_name = 'cluster_overall'
-        df_overall_segmented = get_segments(df_original_prop_and_price_segmented, df_overall_preprocessed,
-                                            overall_cluster_column_name, overall_num_clusters)
-        analyse_segments(df_original, df_overall_preprocessed, df_overall_segmented,
-                         overall_cluster_column_name, overall_num_clusters)
-
+        # ====================================================
+        # old solution
 
         # ------------------------------------------------------
         # house feature analysis
@@ -249,7 +261,7 @@ class Data:
         # pd.set_option('display.float_format', lambda x: '%.0f' % x)
         #
 
-        # print(dataset['prop_type_1hot'].unique())
+        print(dataset['ob_kind'].unique())
         # cols = ['fin_price', 'ob_living_area', 'plot_size']
         #
         # print('price to 450 000 ============================')
