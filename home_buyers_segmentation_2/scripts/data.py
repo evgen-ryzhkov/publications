@@ -303,6 +303,7 @@ class Data:
 
     @staticmethod
     def _clean_data(df):
+        print('[INFO] Rows number before cleaning data = ', df.shape[0])
 
         # drop dublicates
         df_cleaned = df.drop_duplicates(subset="house-link-href", keep="first")
@@ -313,8 +314,7 @@ class Data:
         # drop rudiment columns
         df_cleaned = df_cleaned.drop(columns=['web-scraper-order', 'web-scraper-start-url', 'house-link', 'house-link-href'])
 
-        # drop price anomalies
-        # df_cleaned = df_cleaned.loc[df_cleaned['fin_price']<700000]
+        print('[INFO] Rows number  after cleaning data = ', df_cleaned.shape[0])
 
         return df_cleaned
 

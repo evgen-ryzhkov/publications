@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder, OrdinalEncoder
 import matplotlib.pyplot as plt
+from .k_means_segmentation import get_number_of_segments, get_segments
 
 
 def get_object_segments(df_original):
@@ -12,12 +13,18 @@ def get_object_segments(df_original):
                                   'garage', 'garden']].copy()
     df_preprocessed = _preprocess_data(df_object_data)
 
+    # to define number of cluster, run this function
+    # get_number_of_segments(df_preprocessed)
+    num_clusters = 4
+    object_cluster_column_name = 'cluster_object'
+    # df_original_prop_segmented = get_segments(df_original, df_prop_preprpocessed, property_cluster_column_name, property_num_clusters)
+
     return df_original
 
 
 def _preprocess_data(df):
 
-    # print(df.info())
+    print('[INFO] Object data preprocessing started...')
 
     df_numeric = _convert_text_data(df)
     df_custom_features = _create_custom_features(df_numeric)
@@ -33,49 +40,29 @@ def _preprocess_data(df):
         - energy - personal beliefs (environment friendly)
         ? living area - personal space
     '''
-    df_for_segmentation = df_na_filled[['cat_ob_type', 'ob_bedrooms', 'cat_energy', 'cat_storage', 'cat_garden']]
+    df_for_segmentation = df_na_filled[['ob_bedrooms', 'cat_energy', 'cat_storage', 'cat_garden']]
     # ? df_optimized = _optimize_memory_usage(df_numeric)
 
     # encode property types
     encoder_1hot = OneHotEncoder()
     df_prop_type_1hot = pd.DataFrame(
-        encoder_1hot.fit_transform(df_for_segmentation[['cat_ob_type']]) \
+        encoder_1hot.fit_transform(df_na_filled[['cat_ob_type']]) \
         .toarray(),
-        columns=['Flat', 'Townhouse', 'House']
+        columns=['Flat', 'House', 'Townhouse']
     )
-    # order of columns you can get by print(df_prop_type_1hot.categories_)
+    # order of columns you can get by print(encoder_1hot.categories_)
+    # it will help for creating profiling matrix
 
     # merge encoded df
     df_encode_merged = pd.concat(
         [df_prop_type_1hot.reset_index(drop=True), df_for_segmentation.reset_index(drop=True)],
         axis=1, sort=False)
 
-
     df_scaled = _scale_data(df_encode_merged, ['ob_bedrooms', 'cat_energy', 'cat_storage', 'cat_garden'])
-    print(df_scaled['cat_garden'].describe())
-    # df_encode_merged.hist(column='cat_energy')
-    # plt.show()
 
+    print('[OK] Object data preprocessing finished.')
 
-
-    # df_normalized['ob_bedrooms'] = np.log(df_normalized['ob_bedrooms'])
-
-
-
-
-
-    # print(df_for_segmentation)
-    # print(df_na_filled['garden'].unique())
-    # print(df_na_filled['cat_garden'].unique())
-    # print(df_na_filled['garden'].describe())
-    # print(df_na_filled['cat_garden'].describe())
-    # debug= df_na_filled[['cat_garden', 'garden']].loc[df_na_filled['cat_garden'] == 1]
-    # print(debug['garden'].unique())
-    # print(df_custom_features['cat_car_friendly'].describe())
-    # print(df_na_filled[['ob_ext_storage', 'ob_stories', 'shed_storage', 'garage']].loc[df_na_filled['ob_stories'].str.contains('basement', na=False)])
-
-
-    return df
+    return df_scaled
 
 
 def _convert_text_data(df):
@@ -91,18 +78,15 @@ def _fill_missed_values(df):
     df['cat_ob_type'] = df['cat_ob_type'].fillna('Flat')
 
     # for part of data just insert median value
-    median_columns = ['ob_living_area', 'cat_energy']
+    median_columns = ['ob_living_area', 'cat_energy', 'ob_bedrooms']
     for col in median_columns:
         df[col] = round(df[col].fillna(df[col].median()))
-
-    # most objects has 4 bedrooms
-    df['ob_bedrooms'] = df['ob_bedrooms'].fillna(4)
 
     # NaN storage - there is no storage
     df['cat_storage'] = df['cat_storage'].fillna(1)
 
     # NaN garden - there is no garden
-    df['cat_garden'] = df['cat_garden'].fillna(10)
+    df['cat_garden'] = df['cat_garden'].fillna(1)
 
     return df
 
