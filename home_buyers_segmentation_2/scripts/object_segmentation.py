@@ -2,7 +2,8 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder, OrdinalEncoder
 import matplotlib.pyplot as plt
-from .k_means_segmentation import get_number_of_segments, get_segments
+import seaborn as sns
+from .k_means_segmentation import get_number_of_segments, get_segments, validate_cluster_sizes
 
 
 def get_object_segments(df_original):
@@ -15,9 +16,12 @@ def get_object_segments(df_original):
 
     # to define number of cluster, run this function
     # get_number_of_segments(df_preprocessed)
-    num_clusters = 4
+    num_clusters = 6
     object_cluster_column_name = 'cluster_object'
-    # df_original_prop_segmented = get_segments(df_original, df_prop_preprpocessed, property_cluster_column_name, property_num_clusters)
+    df_original_prop_segmented = get_segments(df_object_data, df_preprocessed, object_cluster_column_name, num_clusters)
+    f_validation, df_stat = validate_cluster_sizes(df_original_prop_segmented, object_cluster_column_name)
+
+    _profile_clusters(df_original_prop_segmented, df_stat, object_cluster_column_name, num_clusters)
 
     return df_original
 
@@ -144,22 +148,37 @@ def _create_custom_features(df):
     # df.loc[df['garage'].str.contains(pat='arage', na=False), 'cat_car_friendly'] = 8
 
     # Garden --------------------------------
+    # # old version
+    # # 1 - no any garden
+    # # 2 - front garden or side garden or terace only
+    # # 3 - front + side garden
+    # # 4 - back garden
+    # # 5 - back + front garden or back + side garde
+    # # 6 - back + front + side garden
+    # # 7 - surrounded by garden
+    # # 8 - surrounded by garden + terrace
+    # init_garden_category = np.ones((df.shape[0], 1))
+    # df['cat_garden'] = init_garden_category
+    #
+    # df.loc[(df['garden'].str.contains(pat='back garden', na=False, case=False)), 'cat_garden'] = 4
+    # df.loc[(df['garden'].str.contains(pat='front garden', na=False, case=False)), 'cat_garden'] += 1
+    # df.loc[(df['garden'].str.contains(pat='side garden', na=False, case=False)), 'cat_garden'] += 1
+    # df.loc[(df['garden'].str.contains(pat='surrounded by garden', na=False, case=False)), 'cat_garden'] = 7
+    # df.loc[(df['garden'].str.contains(pat='sun terrace|atrium', na=False, case=False)), 'cat_garden'] += 1
+
+    # new version
     # 1 - no any garden
-    # 2 - front garden or side garden or terace only
-    # 3 - front + side garden
-    # 4 - back garden
-    # 5 - back + front garden or back + side garde
-    # 6 - back + front + side garden
-    # 7 - surrounded by garden
-    # 8 - surrounded by garden + terrace
+    # 2 - Small Garden: front garden or side garden or terace only or front + side garden
+    # 3 - Medium Garden: there is a back garden
+    # 4 - Big Garden: Surrounded by garden
     init_garden_category = np.ones((df.shape[0], 1))
     df['cat_garden'] = init_garden_category
 
-    df.loc[(df['garden'].str.contains(pat='back garden', na=False, case=False)), 'cat_garden'] = 4
-    df.loc[(df['garden'].str.contains(pat='front garden', na=False, case=False)), 'cat_garden'] += 1
-    df.loc[(df['garden'].str.contains(pat='side garden', na=False, case=False)), 'cat_garden'] += 1
-    df.loc[(df['garden'].str.contains(pat='surrounded by garden', na=False, case=False)), 'cat_garden'] = 7
-    df.loc[(df['garden'].str.contains(pat='sun terrace|atrium', na=False, case=False)), 'cat_garden'] += 1
+    df.loc[(df['garden'].str.contains(pat='sun terrace|atrium', na=False, case=False)), 'cat_garden'] = 2
+    df.loc[(df['garden'].str.contains(pat='front garden|side garden', na=False, case=False)), 'cat_garden'] = 2
+    df.loc[(df['garden'].str.contains(pat='back garden', na=False, case=False)), 'cat_garden'] = 3
+    df.loc[(df['garden'].str.contains(pat='surrounded by garden', na=False, case=False)), 'cat_garden'] = 4
+
 
     return df
 
@@ -181,3 +200,88 @@ def _scale_data(df, cols):
             print(df_normalized[col])
 
     return df_normalized
+
+
+def _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters):
+
+    print('Houses=', len(df_segmented.loc[df_segmented['cat_ob_type'] == 'House']))
+
+    # replace categorical numbers by readable values
+    df_segmented['cat_storage'].loc[df_segmented['cat_storage'] == 1] = 'No storage'
+    df_segmented['cat_storage'].loc[df_segmented['cat_storage'] == 2] = 'S Storage'
+    df_segmented['cat_storage'].loc[df_segmented['cat_storage'] == 3] = 'M Storage'
+    df_segmented['cat_storage'].loc[df_segmented['cat_storage'] == 4] = 'B Storage'
+
+    df_segmented['cat_energy'].loc[df_segmented['cat_energy'] == 7] = 'A'
+    df_segmented['cat_energy'].loc[df_segmented['cat_energy'] == 6] = 'B'
+    df_segmented['cat_energy'].loc[df_segmented['cat_energy'] == 5] = 'C'
+    df_segmented['cat_energy'].loc[df_segmented['cat_energy'] == 4] = 'D'
+    df_segmented['cat_energy'].loc[df_segmented['cat_energy'] == 3] = 'E'
+    df_segmented['cat_energy'].loc[df_segmented['cat_energy'] == 2] = 'F'
+    df_segmented['cat_energy'].loc[df_segmented['cat_energy'] == 1] = 'G'
+
+    df_segmented['cat_garden'].loc[df_segmented['cat_garden'] == 1] = 'No Garden'
+    df_segmented['cat_garden'].loc[df_segmented['cat_garden'] == 2] = 'S Garden'
+    df_segmented['cat_garden'].loc[df_segmented['cat_garden'] == 3] = 'M Garden'
+    df_segmented['cat_garden'].loc[df_segmented['cat_garden'] == 4] = 'B Garden'
+
+    # define value for calculation distribution for each column
+    ob_types = ['Flat', 'House', 'Townhouse']
+    ob_storages = ['No storage', 'S Storage', 'M Storage', 'B Storage']
+    ob_energies = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
+    ob_gardens = ['No Garden', 'S Garden', 'M Garden', 'B Garden']
+    df_profiling_cols = ob_types + ob_storages + ob_energies + ob_gardens
+
+    # initiation of df_profiling
+    n_columns = len(df_profiling_cols)
+    init_array = np.zeros((n_clusters, n_columns))
+    df_profiling = pd.DataFrame(data=init_array, columns=df_profiling_cols)
+
+    # fill df_profiling with real values
+    # value - percents each type of features in cluster
+    for cluster in range(n_clusters):
+        df_cluster = df_segmented.loc[df_segmented[cluster_col_name] == cluster]
+        df_cluster_len = len(df_cluster)
+
+        for col in df_profiling_cols:
+
+            # there are different columns in original df
+            # for different profiling columns
+            # for example: columnn prop_size in df_original
+            # transforms into three columns S, M, L in df_profiling
+            df_col_name = ''
+            if col in ob_types:
+                df_col_name = 'cat_ob_type'
+            elif col in ob_storages:
+                df_col_name = 'cat_storage'
+            elif col in ob_energies:
+                df_col_name = 'cat_energy'
+            elif col in ob_gardens:
+                df_col_name = 'cat_garden'
+
+            percent_val = round((len(df_cluster.loc[df_cluster[df_col_name] == col]) / df_cluster_len) * 100)
+            df_profiling.loc[cluster, col] = percent_val
+
+    # rename price columns for better reading
+    # print(df_profiling.columns[3])
+    # df_profiling.rename(columns={
+    #     df_profiling.columns[3]: 'No storage',
+    #     df_profiling.columns[4]: 'S Storage',
+    #     df_profiling.columns[5]: 'M Storage',
+    #     df_profiling.columns[6]: 'B Storage',
+    #     df_profiling.columns[7]: 'A',
+    # }, inplace=True)
+
+    # add distribution values for each cluster
+    df_profiling = pd.concat([df_stat, df_profiling], axis=1, sort=False)
+    print(df_profiling)
+
+    # rename cluster percents for better reading
+    df_profiling.rename(columns={
+        0: 'Cluster %'
+    }, inplace=True)
+
+    plt.figure(figsize=(20, 10))
+    sns.heatmap(df_profiling, annot=True)
+    plt.show()
+

@@ -40,6 +40,7 @@ def get_number_of_segments(df_normalized):
     print('[INFO] Set number of cluster variable according to the elbow plot')
     exit()
 
+
 def _get_clusters(df_normalized, num_clusters):
     kmeans_model = KMeans(n_clusters=num_clusters, random_state=1)
     kmeans_model.fit(df_normalized)
@@ -48,3 +49,26 @@ def _get_clusters(df_normalized, num_clusters):
     cluster_labels = kmeans_model.labels_
 
     return cluster_labels
+
+
+def validate_cluster_sizes(df_segmented, cluster_col_name):
+    print('[INFO] Segment sizes validation...')
+    df_stat = round(((df_segmented.groupby(cluster_col_name).size())/len(df_segmented))*100).astype(int)
+    print('Cluster distribution, %\n', df_stat)
+
+    f_validation = True
+    for i in range(len(df_stat)):
+        # each segment has to be in 5-30%
+        if (df_stat[i] < 4) | (df_stat[i] > 35):
+            print('[Validation Error: There are segments with bad distribution.]')
+            f_validation = False
+            exit()
+
+    # visualisation of segments distribution
+    if f_validation:
+        # df_stat.plot.bar()
+        # plt.show()
+
+        print('[OK] Segment sizes are OK!')
+
+    return f_validation, df_stat

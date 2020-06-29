@@ -8,7 +8,7 @@ def analyse_segments(df_original, df_normalized, df_segmented, cluster_col_name,
 
     f_validation, df_stat = _validate_cluster_sizes(df_segmented, cluster_col_name)
 
-    _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters)
+    # _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters)
 
     # _show_snake_plot(df_original, df_normalized, df_segmented)
 
