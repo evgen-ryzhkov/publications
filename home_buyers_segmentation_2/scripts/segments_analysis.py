@@ -109,8 +109,8 @@ def _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters):
         0: 'Cluster %'
     }, inplace=True)
 
-    plt.figure(figsize=(20, 10))
-    sns.heatmap(df_profiling, annot=True)
+    plt.figure(figsize=(25, 10))
+    sns.heatmap(df_profiling, annot=True, fmt="d")
     plt.show()
 
 

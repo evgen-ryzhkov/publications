@@ -128,13 +128,9 @@ def _create_custom_features(df):
     df.loc[df['ob_ext_storage'] > 14, 'cat_storage'] = 4
 
     # Energy efficiency ---------------------
-    df.loc[df['ob_energy'].str.contains(pat='A', na=False), 'cat_energy'] = 7  # 'A'
-    df.loc[df['ob_energy'].str.contains(pat='B', na=False), 'cat_energy'] = 6  # 'B'
-    df.loc[df['ob_energy'].str.contains(pat='C', na=False), 'cat_energy'] = 5  # 'C'
-    df.loc[df['ob_energy'].str.contains(pat='D', na=False), 'cat_energy'] = 4  # 'D'
-    df.loc[df['ob_energy'].str.contains(pat='E', na=False), 'cat_energy'] = 3  # 'E'
-    df.loc[df['ob_energy'].str.contains(pat='F', na=False), 'cat_energy'] = 2  # 'F'
-    df.loc[df['ob_energy'].str.contains(pat='G', na=False), 'cat_energy'] = 1  # 'G'
+    df.loc[df['ob_energy'].str.contains(pat='A|B', na=False), 'cat_energy'] = 3  # Good Energy Efficiency
+    df.loc[df['ob_energy'].str.contains(pat='C|D', na=False), 'cat_energy'] = 2  # Normal Energy Efficiency
+    df.loc[df['ob_energy'].str.contains(pat='E|F|G', na=False), 'cat_energy'] = 1  # Poor Energy Efficiency
 
     # Car Friendly Category -----------------
     # 0 - No Place for Car
@@ -148,25 +144,6 @@ def _create_custom_features(df):
     # df.loc[df['garage'].str.contains(pat='arage', na=False), 'cat_car_friendly'] = 8
 
     # Garden --------------------------------
-    # # old version
-    # # 1 - no any garden
-    # # 2 - front garden or side garden or terace only
-    # # 3 - front + side garden
-    # # 4 - back garden
-    # # 5 - back + front garden or back + side garde
-    # # 6 - back + front + side garden
-    # # 7 - surrounded by garden
-    # # 8 - surrounded by garden + terrace
-    # init_garden_category = np.ones((df.shape[0], 1))
-    # df['cat_garden'] = init_garden_category
-    #
-    # df.loc[(df['garden'].str.contains(pat='back garden', na=False, case=False)), 'cat_garden'] = 4
-    # df.loc[(df['garden'].str.contains(pat='front garden', na=False, case=False)), 'cat_garden'] += 1
-    # df.loc[(df['garden'].str.contains(pat='side garden', na=False, case=False)), 'cat_garden'] += 1
-    # df.loc[(df['garden'].str.contains(pat='surrounded by garden', na=False, case=False)), 'cat_garden'] = 7
-    # df.loc[(df['garden'].str.contains(pat='sun terrace|atrium', na=False, case=False)), 'cat_garden'] += 1
-
-    # new version
     # 1 - no any garden
     # 2 - Small Garden: front garden or side garden or terace only or front + side garden
     # 3 - Medium Garden: there is a back garden
@@ -204,21 +181,15 @@ def _scale_data(df, cols):
 
 def _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters):
 
-    print('Houses=', len(df_segmented.loc[df_segmented['cat_ob_type'] == 'House']))
-
     # replace categorical numbers by readable values
     df_segmented['cat_storage'].loc[df_segmented['cat_storage'] == 1] = 'No storage'
     df_segmented['cat_storage'].loc[df_segmented['cat_storage'] == 2] = 'S Storage'
     df_segmented['cat_storage'].loc[df_segmented['cat_storage'] == 3] = 'M Storage'
     df_segmented['cat_storage'].loc[df_segmented['cat_storage'] == 4] = 'B Storage'
 
-    df_segmented['cat_energy'].loc[df_segmented['cat_energy'] == 7] = 'A'
-    df_segmented['cat_energy'].loc[df_segmented['cat_energy'] == 6] = 'B'
-    df_segmented['cat_energy'].loc[df_segmented['cat_energy'] == 5] = 'C'
-    df_segmented['cat_energy'].loc[df_segmented['cat_energy'] == 4] = 'D'
-    df_segmented['cat_energy'].loc[df_segmented['cat_energy'] == 3] = 'E'
-    df_segmented['cat_energy'].loc[df_segmented['cat_energy'] == 2] = 'F'
-    df_segmented['cat_energy'].loc[df_segmented['cat_energy'] == 1] = 'G'
+    df_segmented['cat_energy'].loc[df_segmented['cat_energy'] == 3] = 'Good EE'
+    df_segmented['cat_energy'].loc[df_segmented['cat_energy'] == 2] = 'Normal EE'
+    df_segmented['cat_energy'].loc[df_segmented['cat_energy'] == 1] = 'Poor EE'
 
     df_segmented['cat_garden'].loc[df_segmented['cat_garden'] == 1] = 'No Garden'
     df_segmented['cat_garden'].loc[df_segmented['cat_garden'] == 2] = 'S Garden'
@@ -228,7 +199,7 @@ def _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters):
     # define value for calculation distribution for each column
     ob_types = ['Flat', 'House', 'Townhouse']
     ob_storages = ['No storage', 'S Storage', 'M Storage', 'B Storage']
-    ob_energies = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
+    ob_energies = ['Good EE', 'Normal EE', 'Poor EE']
     ob_gardens = ['No Garden', 'S Garden', 'M Garden', 'B Garden']
     df_profiling_cols = ob_types + ob_storages + ob_energies + ob_gardens
 
@@ -262,26 +233,31 @@ def _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters):
             percent_val = round((len(df_cluster.loc[df_cluster[df_col_name] == col]) / df_cluster_len) * 100)
             df_profiling.loc[cluster, col] = percent_val
 
-    # rename price columns for better reading
-    # print(df_profiling.columns[3])
-    # df_profiling.rename(columns={
-    #     df_profiling.columns[3]: 'No storage',
-    #     df_profiling.columns[4]: 'S Storage',
-    #     df_profiling.columns[5]: 'M Storage',
-    #     df_profiling.columns[6]: 'B Storage',
-    #     df_profiling.columns[7]: 'A',
-    # }, inplace=True)
+    # mean columns
+    df_means = round(df_segmented.groupby(cluster_col_name)['ob_bedrooms', 'ob_living_area'].mean())
+    print(df_means)
 
     # add distribution values for each cluster
-    df_profiling = pd.concat([df_stat, df_profiling], axis=1, sort=False)
+    df_profiling = pd.concat([df_stat, df_profiling, df_means], axis=1, sort=False)
     print(df_profiling)
 
     # rename cluster percents for better reading
     df_profiling.rename(columns={
-        0: 'Cluster %'
+        0: 'Cluster %',
+        'ob_bedrooms': 'Bedrooms',
+        'ob_living_area': 'Liv area'
     }, inplace=True)
 
-    plt.figure(figsize=(20, 10))
-    sns.heatmap(df_profiling, annot=True)
+    mng = plt.get_current_fig_manager()
+    mng.window.state('zoomed')  # full screen mode
+
+    # exclude some columns (like means) from heatmap
+    mask = np.zeros(df_profiling.shape)
+    mask[:, [15,16]] = True
+
+    cm = sns.light_palette("green")
+
+    sns.heatmap(df_profiling, mask=mask, annot=True, fmt="g", cmap=cm)
+    sns.heatmap(df_profiling, alpha=0, cbar=False, annot=True, fmt="g", annot_kws={"color": "black"})
     plt.show()
 
