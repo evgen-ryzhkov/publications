@@ -44,7 +44,7 @@ def _preprocess_data(df):
         - energy - personal beliefs (environment friendly)
         ? living area - personal space
     '''
-    df_for_segmentation = df_na_filled[['ob_bedrooms', 'cat_energy', 'cat_storage', 'cat_garden']]
+    df_for_segmentation = df_na_filled[['ob_bedrooms', 'cat_energy', 'cat_storage', 'cat_garden', 'cat_living_area']]
     # ? df_optimized = _optimize_memory_usage(df_numeric)
 
     # encode property types
@@ -62,7 +62,8 @@ def _preprocess_data(df):
         [df_prop_type_1hot.reset_index(drop=True), df_for_segmentation.reset_index(drop=True)],
         axis=1, sort=False)
 
-    df_scaled = _scale_data(df_encode_merged, ['ob_bedrooms', 'cat_energy', 'cat_storage', 'cat_garden'])
+    df_scaled = _scale_data(df_encode_merged, ['ob_bedrooms', 'cat_energy', 'cat_storage', 'cat_garden',
+                                               'cat_living_area'])
 
     print('[OK] Object data preprocessing finished.')
 
@@ -97,14 +98,15 @@ def _fill_missed_values(df):
 
 def _create_custom_features(df):
     # transform living area into categories
-    # 0 - >100 m2
-    # 1 - 100-150 m2
-    # 2 - 151-250 m2
-    # 3 250 m2 >
-    df.loc[df['ob_living_area'] < 100, 'cat_living_area'] = 0
-    df.loc[(df['ob_living_area'] >= 100) & (df['ob_living_area'] <= 150), 'cat_living_area'] = 1
-    df.loc[(df['ob_living_area'] > 150) & (df['ob_living_area'] <= 250), 'cat_living_area'] = 2
-    df.loc[df['ob_living_area'] > 250, 'cat_living_area'] = 3
+    # 1 - >100 m2
+    # 2 - 100-150 m2
+    # 3 - 151-250 m2
+    # 4 250 m2 >
+    df['ob_living_area'] = round(df['ob_living_area'].fillna(df['ob_living_area'].median()))
+    df.loc[df['ob_living_area'] < 100, 'cat_living_area'] = 1
+    df.loc[(df['ob_living_area'] >= 100) & (df['ob_living_area'] <= 150), 'cat_living_area'] = 2
+    df.loc[(df['ob_living_area'] > 150) & (df['ob_living_area'] <= 250), 'cat_living_area'] = 3
+    df.loc[df['ob_living_area'] > 250, 'cat_living_area'] = 4
 
     # Object type Category -----------------
     # 2 - House (fully detached individual house)
@@ -196,6 +198,7 @@ def _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters):
     df_segmented['cat_garden'].loc[df_segmented['cat_garden'] == 3] = 'M Garden'
     df_segmented['cat_garden'].loc[df_segmented['cat_garden'] == 4] = 'B Garden'
 
+
     # define value for calculation distribution for each column
     ob_types = ['Flat', 'House', 'Townhouse']
     ob_storages = ['No storage', 'S Storage', 'M Storage', 'B Storage']
@@ -234,18 +237,17 @@ def _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters):
             df_profiling.loc[cluster, col] = percent_val
 
     # mean columns
-    df_means = round(df_segmented.groupby(cluster_col_name)['ob_bedrooms', 'ob_living_area'].mean())
-    print(df_means)
+    df_means = round(df_segmented.groupby(cluster_col_name)['cat_living_area', 'ob_bedrooms'].mean())
 
     # add distribution values for each cluster
     df_profiling = pd.concat([df_stat, df_profiling, df_means], axis=1, sort=False)
-    print(df_profiling)
+
 
     # rename cluster percents for better reading
     df_profiling.rename(columns={
         0: 'Cluster %',
         'ob_bedrooms': 'Bedrooms',
-        'ob_living_area': 'Liv area'
+        'cat_living_area': 'Liv area'
     }, inplace=True)
 
     mng = plt.get_current_fig_manager()
@@ -253,7 +255,7 @@ def _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters):
 
     # exclude some columns (like means) from heatmap
     mask = np.zeros(df_profiling.shape)
-    mask[:, [15,16]] = True
+    mask[:, [15, 16]] = True
 
     cm = sns.light_palette("green")
 
@@ -261,3 +263,10 @@ def _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters):
     sns.heatmap(df_profiling, alpha=0, cbar=False, annot=True, fmt="g", annot_kws={"color": "black"})
     plt.show()
 
+    # transform some number value into readable
+    df_profiling['Liv area'].loc[df_profiling['Liv area'] == 1] = '>100 m2'
+    df_profiling['Liv area'].loc[df_profiling['Liv area'] == 2] = '100-150m2'
+    df_profiling['Liv area'].loc[df_profiling['Liv area'] == 3] = '151-250m2'
+    df_profiling['Liv area'].loc[df_profiling['Liv area'] == 4] = '250m2 +'
+
+    print(df_profiling.sort_values('Cluster %', ascending=False))
