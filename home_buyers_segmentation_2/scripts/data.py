@@ -20,6 +20,7 @@ Usage:
 from .k_means_segmentation import get_number_of_segments, get_segments
 from .segments_analysis import analyse_segments
 from .object_segmentation import get_object_segments
+from .price_segmentation import get_price_segments
 
 import os
 import numpy as np
@@ -41,8 +42,8 @@ class Data:
         # general data cleaning
         df_original_cleaned = self._clean_data(df_city_loaded)
 
-        df_object_segments = get_object_segments(df_original_cleaned)
-        print(df_object_segments)
+        # df_object_segments = get_object_segments(df_original_cleaned)
+        df_price_segments = get_price_segments(df_original_cleaned)
 
         # self._familiarity_with_data(df_original_cleaned)
 

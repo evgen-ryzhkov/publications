@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import MinMaxScaler, OneHotEncoder, OrdinalEncoder
+from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
 import matplotlib.pyplot as plt
 import seaborn as sns
 from .k_means_segmentation import get_number_of_segments, get_segments, validate_cluster_sizes
