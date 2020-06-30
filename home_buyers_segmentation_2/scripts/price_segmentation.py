@@ -22,6 +22,7 @@ def get_price_segments(df_original):
 
     return df_price_clusters
 
+
 def _preprocess_data(df):
     print('[INFO] Object data preprocessing started...')
     df_numeric = _convert_text_data(df)
