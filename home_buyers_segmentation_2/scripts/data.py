@@ -42,7 +42,7 @@ class Data:
         df_original_cleaned = self._clean_data(df_city_loaded)
 
         df_object_segments = get_object_segments(df_original_cleaned)
-
+        print(df_object_segments)
 
         # self._familiarity_with_data(df_original_cleaned)
 

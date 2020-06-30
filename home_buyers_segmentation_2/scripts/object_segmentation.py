@@ -16,14 +16,15 @@ def get_object_segments(df_original):
 
     # to define number of cluster, run this function
     # get_number_of_segments(df_preprocessed)
-    num_clusters = 7
+    num_clusters = 6
     object_cluster_column_name = 'cluster_object'
     df_original_prop_segmented = get_segments(df_object_data, df_preprocessed, object_cluster_column_name, num_clusters)
     f_validation, df_stat = validate_cluster_sizes(df_original_prop_segmented, object_cluster_column_name)
 
     _profile_clusters(df_original_prop_segmented, df_stat, object_cluster_column_name, num_clusters)
+    df_object_clusters = _prepare_for_overall_clustering(df_original_prop_segmented)
 
-    return df_original
+    return df_object_clusters
 
 
 def _preprocess_data(df):
@@ -281,3 +282,18 @@ def _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters):
     df_profiling['Liv area'].loc[df_profiling['Liv area'] == 4] = '250m2 +'
 
     print(df_profiling.sort_values('Cluster %', ascending=False))
+
+
+def _prepare_for_overall_clustering(df):
+
+    # choose object features for common profiling
+    df_prepared = df[['cluster_object', 'cat_ob_type', 'ob_bedrooms', 'ob_living_area', 'cat_living_area', 'ob_vol_cub',
+                      'cat_storage', 'cat_energy', 'cat_car_friendly', 'cat_garden']].copy()
+
+    # transform some number value into readable
+    df_prepared['cat_living_area'].loc[df_prepared['cat_living_area'] == 1] = '>100 m2'
+    df_prepared['cat_living_area'].loc[df_prepared['cat_living_area'] == 2] = '100-150m2'
+    df_prepared['cat_living_area'].loc[df_prepared['cat_living_area'] == 3] = '151-250m2'
+    df_prepared['cat_living_area'].loc[df_prepared['cat_living_area'] == 4] = '250m2 +'
+
+    return df_prepared
