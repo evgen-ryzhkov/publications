@@ -57,13 +57,17 @@ def _create_neighborhood_csv(df):
     df_neigborhoods['commit_time_driving'] = ''
     df_neigborhoods['commit_time_transit'] = ''
 
-    API_URL = 'https://maps.googleapis.com/maps/api/distancematrix/json?'
+    DISTANCE_API_URL = 'https://maps.googleapis.com/maps/api/distancematrix/json?'
+    PLACE_API_URL = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json?'
+    GEOCODING_API_URL = 'https://maps.googleapis.com/maps/api/geocode/json?'
+
     COUNTRY = ',Netherlands'
     DESTINATION = 'Amsterdam+Centraal+railway+station,+Stationsplein,+1012+AB+Amsterdam,+Netherlands'
     API_KEY_S = '@key=' + API_KEY
 
-    DEBUG_CITY = 'Noordwijk (ZH)'
-    DEBUG_NEIGHBORHOOD = 'Dorpskern'
+    # TODO как минимум в субрбах, не для всех нейбрхудов находится геолокацияя. надо думать как определять такие ситуации, и тогда ограничивться только городом
+    DEBUG_CITY = 'Purmerend'
+    DEBUG_NEIGHBORHOOD = 'Stationsbuurt'
 
     DEBUG_CITY_ESC = re.sub('[()]', '', DEBUG_CITY)
     DEBUG_NEIGHBORHOOD_ESC = re.sub('[()]', '', DEBUG_NEIGHBORHOOD)
@@ -72,6 +76,7 @@ def _create_neighborhood_csv(df):
 
     ORIGINS = DEBUG_CITY_SPACE_REMOVED + DEBUG_NEIGHBORHOOD_REMOVED + COUNTRY
 
+    # get distance -----------------
     params_driving = {
         'language': 'en-EN',
         'mode': 'driving',
@@ -79,29 +84,54 @@ def _create_neighborhood_csv(df):
         'destinations': DESTINATION,
         'origins': ORIGINS
     }
-    response = requests.get(API_URL, params=params_driving)
-    response.raise_for_status()
-    response_json = response.json()
-    df_neigborhoods.at[df_neigborhoods.index[0], 'commit_time_driving'] = \
-    response_json['rows'][0]['elements'][0]['duration']['text']
+    # response = requests.get(DISTANCE_API_URL, params=params_driving)
+    # response.raise_for_status()
+    # response_json = response.json()
+    # df_neigborhoods.at[df_neigborhoods.index[0], 'commit_time_driving'] = \
+    # response_json['rows'][0]['elements'][0]['duration']['text']
+    #
+    # params_transit = {
+    #     'language': 'en-EN',
+    #     'mode': 'transit',
+    #     'key': API_KEY,
+    #     'destinations': DESTINATION,
+    #     'origins': ORIGINS
+    # }
+    # response = requests.get(DISTANCE_API_URL, params = params_transit)
+    # response.raise_for_status()
+    # response_json = response.json()
+    # df_neigborhoods.at[df_neigborhoods.index[0], 'commit_time_transit']= response_json['rows'][0]['elements'][0]['duration']['text']
 
-    params_transit = {
-        'language': 'en-EN',
-        'mode': 'transit',
+    # get geo location
+    # it needs for getting place info
+    params_geocoding = {
         'key': API_KEY,
-        'destinations': DESTINATION,
-        'origins': ORIGINS
+        'address': ORIGINS
     }
-    response = requests.get(API_URL, params = params_transit)
+    response = requests.get(GEOCODING_API_URL, params=params_geocoding)
     response.raise_for_status()
     response_json = response.json()
-    df_neigborhoods.at[df_neigborhoods.index[0], 'commit_time_transit']= response_json['rows'][0]['elements'][0]['duration']['text']
+    lat = response_json['results'][0]['geometry']['location']['lat']
+    lng = response_json['results'][0]['geometry']['location']['lng']
+    print(lat)
+    print(lng)
 
+    # get place info ----------------
+    params_primary_school = {
+        'language': 'en-EN',
+        'key': API_KEY,
+        'type': 'school',
+        'location': str(lat) + ',' + str(lng),
+        # 'location': '52.2713204,4.4409716',
+        'radius': 2000
+    }
+    response = requests.get(PLACE_API_URL, params=params_primary_school)
+    response.raise_for_status()
+    response_json = response.json()
+    print(len(response_json['results']))
 
-    # response_json = {'destination_addresses': ['Amsterdam Centraal, Stationsplein, 1012 AB Amsterdam, Netherlands'], 'origin_addresses': ['Noordwijk, Netherlands'], 'rows': [{'elements': [{'distance': {'text': '46.5 km', 'value': 46483}, 'duration': {'text': '40 mins', 'value': 2407}, 'status': 'OK'}]}], 'status': 'OK'}
-
-
-    print(df_neigborhoods)
+\
+    # print(df_neigborhoods)
 
     # for index, row in df.iterrows():
     #     print(row['city'], row['neighborhood'])
