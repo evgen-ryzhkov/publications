@@ -5,13 +5,15 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from .k_means_segmentation import get_number_of_segments, get_segments, validate_cluster_sizes
 from settings.secrets import API_KEY
+import requests
+import re
 
 
 def get_place_segments(df_original):
 
-    # print(len(df_original.loc[pd.isna(df_original['location'])]))
-
     df_place_data = df_original[['city', 'neighborhood', 'location']].copy()
+    _create_neighborhood_csv(df_place_data)
+
     # df_preprocessed = _preprocess_data(df_place_data)
 
     # to define number of cluster, run this function
@@ -49,23 +51,62 @@ def _create_neighborhood_csv(df):
         using neighborhood names and Google Distance Matrix Api
         get more useful information about neighbohoods
     '''
-    df_neigborhoods = df[['city', 'neighborhood']].drop_duplicates()
+    df_neigborhoods = df.copy()
+    df_neigborhoods = df_neigborhoods[['city', 'neighborhood']].drop_duplicates()
 
-    df_neigborhoods['commit_time_car'] = ''
+    df_neigborhoods['commit_time_driving'] = ''
     df_neigborhoods['commit_time_transit'] = ''
 
-    API_URL = 'http://maps.googleapis.com/maps/api/distancematrix/json?' + \
-              'language=en-EN' + \
-              '&mode=driving'
-    COUNTRY_NAME = 'Netherlands'
+    API_URL = 'https://maps.googleapis.com/maps/api/distancematrix/json?'
+    COUNTRY = ',Netherlands'
+    DESTINATION = 'Amsterdam+Centraal+railway+station,+Stationsplein,+1012+AB+Amsterdam,+Netherlands'
     API_KEY_S = '@key=' + API_KEY
 
+    DEBUG_CITY = 'Noordwijk (ZH)'
+    DEBUG_NEIGHBORHOOD = 'Dorpskern'
+
+    DEBUG_CITY_ESC = re.sub('[()]', '', DEBUG_CITY)
+    DEBUG_NEIGHBORHOOD_ESC = re.sub('[()]', '', DEBUG_NEIGHBORHOOD)
+    DEBUG_CITY_SPACE_REMOVED = DEBUG_CITY_ESC.replace(' ', '+')
+    DEBUG_NEIGHBORHOOD_REMOVED = DEBUG_NEIGHBORHOOD_ESC.replace(' ', '+')
+
+    ORIGINS = DEBUG_CITY_SPACE_REMOVED + DEBUG_NEIGHBORHOOD_REMOVED + COUNTRY
+
+    params_driving = {
+        'language': 'en-EN',
+        'mode': 'driving',
+        'key': API_KEY,
+        'destinations': DESTINATION,
+        'origins': ORIGINS
+    }
+    response = requests.get(API_URL, params=params_driving)
+    response.raise_for_status()
+    response_json = response.json()
+    df_neigborhoods.at[df_neigborhoods.index[0], 'commit_time_driving'] = \
+    response_json['rows'][0]['elements'][0]['duration']['text']
+
+    params_transit = {
+        'language': 'en-EN',
+        'mode': 'transit',
+        'key': API_KEY,
+        'destinations': DESTINATION,
+        'origins': ORIGINS
+    }
+    response = requests.get(API_URL, params = params_transit)
+    response.raise_for_status()
+    response_json = response.json()
+    df_neigborhoods.at[df_neigborhoods.index[0], 'commit_time_transit']= response_json['rows'][0]['elements'][0]['duration']['text']
 
 
-    for index, row in df.iterrows():
-        print(row['city'], row['neighborhood'])
+    # response_json = {'destination_addresses': ['Amsterdam Centraal, Stationsplein, 1012 AB Amsterdam, Netherlands'], 'origin_addresses': ['Noordwijk, Netherlands'], 'rows': [{'elements': [{'distance': {'text': '46.5 km', 'value': 46483}, 'duration': {'text': '40 mins', 'value': 2407}, 'status': 'OK'}]}], 'status': 'OK'}
+
 
     print(df_neigborhoods)
+
+    # for index, row in df.iterrows():
+    #     print(row['city'], row['neighborhood'])
+
+    # print(response_json)
 
 def _create_custom_features(df):
     # in the city or suburbs
