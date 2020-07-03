@@ -8,6 +8,9 @@ from settings.secrets import API_KEY
 import requests
 import re
 
+NEIGHBORHOODS_CSV_EMPTY_PATH = 'data/neighborhoods_empty.csv'
+NEIGHBORHOODS_CSV_PATH = 'data/neighborhoods.csv'
+
 
 def get_place_segments(df_original):
 
@@ -46,17 +49,11 @@ def _preprocess_data(df):
     return df_for_segmentation
 
 
-def _create_neighborhood_csv(df):
-    '''
-        using neighborhood names and Google Distance Matrix Api
-        get more useful information about neighbohoods
-    '''
-    df_neigborhoods = df.copy()
-    df_neigborhoods = df_neigborhoods[['city', 'neighborhood']].drop_duplicates()
 
-    df_neigborhoods['commit_time_driving'] = ''
-    df_neigborhoods['commit_time_transit'] = ''
 
+
+
+def _fill_neighborhood_csv(df):
     DISTANCE_API_URL = 'https://maps.googleapis.com/maps/api/distancematrix/json?'
     PLACE_API_URL = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json?'
     GEOCODING_API_URL = 'https://maps.googleapis.com/maps/api/geocode/json?'
@@ -130,7 +127,6 @@ def _create_neighborhood_csv(df):
     response_json = response.json()
     print(len(response_json['results']))
 
-\
     # print(df_neigborhoods)
 
     # for index, row in df.iterrows():
