@@ -8,14 +8,10 @@ from settings.secrets import API_KEY
 import requests
 import re
 
-NEIGHBORHOODS_CSV_EMPTY_PATH = 'data/neighborhoods_empty.csv'
-NEIGHBORHOODS_CSV_PATH = 'data/neighborhoods.csv'
-
 
 def get_place_segments(df_original):
 
     df_place_data = df_original[['city', 'neighborhood', 'location']].copy()
-    _create_neighborhood_csv(df_place_data)
 
     # df_preprocessed = _preprocess_data(df_place_data)
 
