@@ -56,8 +56,7 @@ class Neighborhoods:
             self._check_problems(df_neighborhoods, args['csv_file_path'])
 
 
-    @staticmethod
-    def _create_empty_csv(df, empty_file_path):
+    def _create_empty_csv(self, df, empty_file_path):
         '''
             using donor file take neighborhood names
             create csv file with unique pairs of city_name and neighborhood name
@@ -80,15 +79,9 @@ class Neighborhoods:
         df_neigborhoods['supermarket_num'] = ''
         df_neigborhoods['park_num'] = ''
 
-        # save csv file
-        try:
-            df_neigborhoods.to_csv(empty_file_path, encoding='utf-8', index=False)
-            print('[OK] Neighborhoods csv was created.')
-        except Exception as e:
-            print('[ERROR] Something wrong with csv creating. ' + str(e))
+        self._save_csf_file(df_neigborhoods, empty_file_path)
 
-    @staticmethod
-    def _add_neighborhoods(df_neighborhoods, df_real_estate, data_csv_path):
+    def _add_neighborhoods(self, df_neighborhoods, df_real_estate, data_csv_path):
         print('[INFO] Updating neighborhoods csv creating was started...')
         # TODO code dublicate, need refactoring
         df_new_neigborhoods = df_real_estate.copy()
@@ -109,15 +102,9 @@ class Neighborhoods:
         df_merged = pd.concat([df_neighborhoods, df_new_neigborhoods])
         df_merged = df_merged.drop_duplicates(subset=['city', 'neighborhood'], keep='first')
 
-        # update csv file
-        try:
-            df_merged.to_csv(data_csv_path, encoding='utf-8', index=False)
-            print('[OK] Neighborhoods csv was saved.')
-        except Exception as e:
-            print('[ERROR] Something wrong with csv saving. ' + str(e))
+        self._save_csf_file(df_merged, data_csv_path)
 
-    @staticmethod
-    def _fill_csv_with_coord(df_neighborhoods, data_csv_path):
+    def _fill_csv_with_coord(self, df_neighborhoods, data_csv_path):
         print('[INFO] Filling coordinates was started...')
         GEOCODING_API_URL = 'https://maps.googleapis.com/maps/api/geocode/json?'
         problem_rows = []
@@ -163,31 +150,19 @@ class Neighborhoods:
                         problem_rows.append(index)
                         continue
 
-        # update csv file
-        try:
-            df_neighborhoods.to_csv(data_csv_path, encoding='utf-8', index=False)
-            print('[OK] Neighborhoods csv was saved.')
-            if len(problem_rows) > 0:
-                print('[ERROR] There were problem rows:', problem_rows)
-            else:
-                print('[OK] There were not any problem rows.')
-        except Exception as e:
-            print('[ERROR] Something wrong with csv saving. ' + str(e))
+        self._save_csf_file(df_neighborhoods, data_csv_path)
+        if len(problem_rows) > 0:
+            print('[ERROR] There were problem rows:', problem_rows)
+        else:
+            print('[OK] There were not any problem rows.')
 
-    @staticmethod
-    def _check_problems(df_neighborhoods, data_csv_path):
+    def _check_problems(self, df_neighborhoods, data_csv_path):
         # analysis of problem rows
         #print(df_neighborhoods.loc[2233])
 
         # fix problems
         df_fixed = df_neighborhoods.drop([df_neighborhoods.index[2233]])
-
-        # update csv file
-        try:
-            df_fixed.to_csv(data_csv_path, encoding='utf-8', index=False)
-            print('[OK] Neighborhoods csv was saved.')
-        except Exception as e:
-            print('[ERROR] Something wrong with csv saving. ' + str(e))
+        self._save_csf_file(df_fixed, data_csv_path)
 
     @staticmethod
     def _load_csv_data(dir_path):
@@ -216,6 +191,15 @@ class Neighborhoods:
             raise ValueError('[ERROR] CSV file not found!')
         except:
             raise ValueError('[ERROR] Something wrong with loading of CSV file!')
+
+    @staticmethod
+    def _save_csf_file(df, data_csv_path):
+        # update csv file
+        try:
+            df.to_csv(data_csv_path, encoding='utf-8', index=False)
+            print('[OK] Neighborhoods csv was saved.')
+        except Exception as e:
+            print('[ERROR] Something wrong with csv saving. ' + str(e))
 
     @staticmethod
     def _get_command_line_arguments():
