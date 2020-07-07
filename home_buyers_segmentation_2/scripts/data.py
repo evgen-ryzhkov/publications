@@ -45,6 +45,7 @@ class Data:
 
         # df_object_segments = get_object_segments(df_original_cleaned)
         # df_price_segments = get_price_segments(df_original_cleaned)
+
         df_place_segments = get_place_segments(df_original_cleaned)
 
         # self._familiarity_with_data(df_original_cleaned)

@@ -17,18 +17,19 @@ def get_place_segments(df_original):
     neighborhood_csv_path = 'data/neighborhoods/data.csv'
     df_neighborhood = _load_csv_file(neighborhood_csv_path)
 
-    df_place_merged = pd.merge(df_place_data, df_neighborhood, how='left', left_on=['city', 'neighborhood'], right_on=['city', 'neighborhood'])
+    df_place_merged = pd.merge(df_place_data, df_neighborhood, how='left', left_on=['city', 'neighborhood'],
+                               right_on=['city', 'neighborhood'])
 
     df_preprocessed = _preprocess_data(df_place_merged)
 
     # to define number of cluster, run this function
     # get_number_of_segments(df_preprocessed)
-    # num_clusters = 5
-    # place_cluster_column_name = 'cluster_place'
-    # df_original_place_segmented = get_segments(df_place_data, df_preprocessed, place_cluster_column_name, num_clusters)
-    # f_validation, df_stat = validate_cluster_sizes(df_original_place_segmented, place_cluster_column_name)
-    #
-    # _profile_clusters(df_original_place_segmented, df_stat, place_cluster_column_name, num_clusters)
+    num_clusters = 6
+    place_cluster_column_name = 'cluster_place'
+    df_original_place_segmented = get_segments(df_place_merged, df_preprocessed, place_cluster_column_name, num_clusters)
+    f_validation, df_stat = validate_cluster_sizes(df_original_place_segmented, place_cluster_column_name)
+
+    _profile_clusters(df_original_place_segmented, df_stat, place_cluster_column_name, num_clusters)
 
 
 def _preprocess_data(df):
@@ -36,7 +37,8 @@ def _preprocess_data(df):
 
     df_numeric = _convert_text_data(df)
 
-    df_custom_features = _create_custom_features(df)
+    df_custom_features = _create_custom_features(df_numeric)
+    df_filled_nan = _fill_nan(df_custom_features)
 
     # choosing meaningful features for segmentation
     '''
@@ -46,19 +48,53 @@ def _preprocess_data(df):
     # df_for_segmentation = df_custom_features[['cat_city', 'cat_suburbs', 'loc_quiet_road', 'loc_busy_road',
     #                                           'loc_in_center', 'loc_res_district', 'loc_near_park',
     #                                           'loc_near_forest', 'loc_near_water', 'loc_rural']]
-    df_for_segmentation = df_custom_features[['cat_city', 'cat_suburbs', 'loc_quiet', 'loc_nature', 'loc_walkability']]
+    df_for_segmentation = df_filled_nan[['loc_view', 'school_cat', 'cafe_rest_cat',
+                                         'nightlife_cat', 'park_cat', 'commit_driving_cat', 'commit_transit_cat']]
+
+    # encode property types
+    encoder_1hot = OneHotEncoder()
+    df_loc_type_1hot = pd.DataFrame(
+        encoder_1hot.fit_transform(df_filled_nan[['cat_loc']]) \
+            .toarray(),
+        columns=['City', 'Suburbs']
+    )
+    # order of columns you can get by print(encoder_1hot.categories_)
+    # it will help for creating profiling matrix
+
+    # merge encoded df
+    df_encode_merged = pd.concat(
+        [df_loc_type_1hot.reset_index(drop=True), df_for_segmentation.reset_index(drop=True)],
+        axis=1, sort=False)
+
+    df_scaled = _scale_data(df_encode_merged, ['school_cat', 'cafe_rest_cat', 'nightlife_cat', 'park_cat',
+                                                  'commit_driving_cat', 'commit_transit_cat'])
+
     print('[OK] Place data preprocessing finished.')
-    return df_for_segmentation
+    return df_scaled
 
 
 def _convert_text_data(df):
-    count = 0
-    df['commit_time_driving_mins'] = ''
+    print('[INFO] Converting commit driving time into minutes...')
+    df_converted = _convert_commit_time(df, 'commit_time_driving')
+
+    print('[INFO] Converting commit transit time into minutes...')
+    df_converted = _convert_commit_time(df_converted, 'commit_time_transit')
+
+    return df_converted
+
+
+def _convert_commit_time(df, col_name):
     # convert commit time from hours & minutes format into minutes only
+    df[col_name + '_mins'] = ''
+
     for index, row in df.iterrows():
-        count +=1
+        # if nan just skip it for now
+        if pd.isna(row[col_name]):
+            continue
+        else:
+            s = row[col_name]
+
         hours_exist = False
-        s = row['commit_time_driving']
         sub_hours = 'hour'
         sub_mins = 'mins'
 
@@ -80,71 +116,129 @@ def _convert_text_data(df):
             mins = '0'
 
         try:
-            df.loc[index, 'commit_time_driving_mins'] = int(hours.replace(' ', '')) * 60 + int(re.sub('[s ]', '', mins))
+            df.loc[index, col_name+'_mins'] = int(hours.replace(' ', '')) * 60 + int(re.sub('[s ]', '', mins))
         except:
             print('hours=', hours)
             print('mins=', mins)
-
-    print(df)
 
     return df
 
 
 def _create_custom_features(df):
     # in the city or suburbs
-    df.loc[df['city'] == 'Amsterdam', 'cat_city'] = 1
-    df.loc[df['city'] != 'Amsterdam', 'cat_suburbs'] = 1
+    df.loc[df['city'] == 'Amsterdam', 'cat_loc'] = 'City'
+    df.loc[df['city'] != 'Amsterdam', 'cat_loc'] = 'Suburbs'
 
-    # print(df['city'].unique())
+    # df.loc[df['location'].str.contains(pat='quiet road|rural', na=False, case=False), 'loc_quiet'] = 1
+    # df.loc[df['location'].str.contains(pat='in center|residential district', na=False, case=False), 'loc_walkability'] = 1
+    df.loc[df['location'].str.contains(pat='alongside park|forest|wooded surroundings|water|waterway|seaview', na=False, case=False), 'loc_view'] = 1
 
-    # # get unique values for feature analysis
-    # # excluding nan
-    # loc_values_list =df['location'].loc[pd.notna(df['location'])].unique().tolist()
-    #
-    # # join into one string in order to convert back into list but in our conditions
-    # separator = ', '
-    # loc_values_string = separator.join(loc_values_list)
-    # loc_values_string_without_and = loc_values_string.replace(' and', ',')
-    #
-    # # convert string into list and get unique values
-    # loc_values_list_2 = loc_values_string_without_and.split(', ')
-    # loc_values_numpy = np.array(loc_values_list_2)
-    #
-    # print(np.unique(loc_values_numpy))
+    df.loc[df['school_num']<6, 'school_cat'] = 1
+    df.loc[(df['school_num']>5) & (df['school_num']<13), 'school_cat'] = 2
+    df.loc[df['school_num']>12, 'school_cat'] = 3
 
-    # custom creating onehot encoding for location
-    # df.loc[df['location'].str.contains(pat='quiet road', na=False, case=False), 'loc_quiet_road'] = 1
-    # df.loc[df['location'].str.contains(pat='busy road', na=False, case=False), 'loc_busy_road'] = 1
-    # df.loc[df['location'].str.contains(pat='in center', na=False, case=False), 'loc_in_center'] = 1
-    # df.loc[df['location'].str.contains(pat='residential district', na=False, case=False), 'loc_res_district'] = 1
-    # df.loc[df['location'].str.contains(pat='alongside park', na=False, case=False), 'loc_near_park'] = 1
-    # df.loc[df['location'].str.contains(pat='forest|wooded surroundings', na=False, case=False), 'loc_near_forest'] = 1
-    # df.loc[df['location'].str.contains(pat='water|waterway|seaview', na=False, case=False), 'loc_near_water'] = 1
-    # df.loc[df['location'].str.contains(pat='rural', na=False, case=False), 'loc_rural'] = 1
+    df.loc[(df['cafe_num'] + df['restaurant_num']) < 15, 'cafe_rest_cat'] = 1
+    df.loc[((df['cafe_num'] + df['restaurant_num']) >= 15) & ((df['cafe_num'] + df['restaurant_num']) < 25), 'cafe_rest_cat'] = 2
+    df.loc[(df['cafe_num'] + df['restaurant_num']) >= 25 , 'cafe_rest_cat'] = 3
 
-    df.loc[df['location'].str.contains(pat='quiet road|rural', na=False, case=False), 'loc_quiet'] = 1
-    df.loc[df['location'].str.contains(pat='alongside park|forest|wooded surroundings|water|waterway|seaview', na=False, case=False), 'loc_nature'] = 1
-    df.loc[df['location'].str.contains(pat='in center|residential district', na=False, case=False), 'loc_walkability'] = 1
+    df.loc[(df['bar_num'] + df['night_clubs_num'] + df['movie_theatres_num']) < 6, 'nightlife_cat'] = 1
+    df.loc[(df['bar_num'] + df['night_clubs_num'] + df['movie_theatres_num']) >= 6, 'nightlife_cat'] = 2
+    df.loc[(df['bar_num'] + df['night_clubs_num'] + df['movie_theatres_num']) >= 10, 'nightlife_cat'] = 3
 
-    # fill nan for new custom features
-    # nan_columns = ['cat_city', 'cat_suburbs', 'loc_quiet_road', 'loc_busy_road', 'loc_in_center', 'loc_res_district', 'loc_near_park',
-    #                'loc_near_forest', 'loc_near_water', 'loc_rural']
+    df.loc[(df['park_num']) < 1, 'park_cat'] = 1
+    df.loc[(df['park_num']) <= 2, 'park_cat'] = 2
+    df.loc[(df['park_num']) > 2, 'park_cat'] = 3
 
-    nan_columns = ['cat_city', 'cat_suburbs', 'loc_quiet', 'loc_nature', 'loc_walkability']
-    for col in nan_columns:
-        df[col] = df[col].fillna(0)
+    df.loc[(df['commit_time_driving_mins']) >= 60, 'commit_driving_cat'] = 1
+    df.loc[(df['commit_time_driving_mins']) < 60, 'commit_driving_cat'] = 2
+    df.loc[(df['commit_time_driving_mins']) <= 40, 'commit_driving_cat'] = 3
+    df.loc[(df['commit_time_driving_mins']) <= 20, 'commit_driving_cat'] = 4
+
+    # fixing some errors in values
+    df.loc[df['commit_time_transit_mins']== '', 'commit_time_transit_mins'] = df['commit_time_driving_mins']*2
+
+    df.loc[(df['commit_time_transit_mins']) >= 80, 'commit_transit_cat'] = 1
+    df.loc[(df['commit_time_transit_mins']) < 80, 'commit_transit_cat'] = 2
+    df.loc[(df['commit_time_transit_mins']) <= 60, 'commit_transit_cat'] = 3
+    df.loc[(df['commit_time_transit_mins']) <= 40, 'commit_transit_cat'] = 4
+    df.loc[(df['commit_time_transit_mins']) <= 20, 'commit_transit_cat'] = 5
 
     return df
 
 
-def _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters):
-    # define value for calculation distribution for each column
-    loc_types = ['cat_city', 'cat_suburbs',]
-    # loc_properties = ['loc_quiet_road', 'loc_busy_road', 'loc_in_center', 'loc_res_district', 'loc_near_park',
-    #                'loc_near_forest', 'loc_near_water', 'loc_rural']
-    loc_properties = ['loc_quiet', 'loc_nature', 'loc_walkability']
-    df_profiling_cols = loc_types + loc_properties
+def _fill_nan(df):
+    nan_columns = ['loc_view']
+    for col in nan_columns:
+        df[col] = df[col].fillna(0)
 
+    df['nightlife_cat'] = df['nightlife_cat'].fillna(1)
+
+    return df
+
+
+def _scale_data(df, cols):
+    # normalize and scale data
+    df_normalized = df.copy()
+    min_max_scaler = MinMaxScaler()
+
+    for col in cols:
+        # Transform Skewed Data
+        df_normalized[col] = np.log(df_normalized[col])
+
+        # scale data
+        # min max scaler because there are outliers in dataset
+        try:
+            df_normalized[[col]] = min_max_scaler.fit_transform(df_normalized[[col]])
+        except:
+            print(df_normalized[col])
+
+    return df_normalized
+
+
+def _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters):
+
+    # replace categorical numbers by readable values
+    df_segmented['loc_view'].loc[df_segmented['loc_view'] == 0] = 'No view'
+    df_segmented['loc_view'].loc[df_segmented['loc_view'] == 1] = 'Good view'
+
+    df_segmented['school_cat'].loc[df_segmented['school_cat'] == 1] = 'Few sch'
+    df_segmented['school_cat'].loc[df_segmented['school_cat'] == 2] = 'A few of sch'
+    df_segmented['school_cat'].loc[df_segmented['school_cat'] == 3] = 'A lot of sch'
+
+    df_segmented['cafe_rest_cat'].loc[df_segmented['cafe_rest_cat'] == 1] = 'Few cafe'
+    df_segmented['cafe_rest_cat'].loc[df_segmented['cafe_rest_cat'] == 2] = 'A few of cafe'
+    df_segmented['cafe_rest_cat'].loc[df_segmented['cafe_rest_cat'] == 3] = 'A lot of cafe'
+
+    df_segmented['nightlife_cat'].loc[df_segmented['nightlife_cat'] == 1] = 'Poor N_life'
+    df_segmented['nightlife_cat'].loc[df_segmented['nightlife_cat'] == 2] = 'Good N_life'
+    df_segmented['nightlife_cat'].loc[df_segmented['nightlife_cat'] == 3] = 'V Good N_life'
+
+    df_segmented['park_cat'].loc[df_segmented['park_cat'] == 1] = 'None parks'
+    df_segmented['park_cat'].loc[df_segmented['park_cat'] == 2] = 'A few of parks'
+    df_segmented['park_cat'].loc[df_segmented['park_cat'] == 3] = 'A lot of parks'
+
+    df_segmented['commit_driving_cat'].loc[df_segmented['commit_driving_cat'] == 1] = '>1h driving'
+    df_segmented['commit_driving_cat'].loc[df_segmented['commit_driving_cat'] == 2] = '40-60 mins driving'
+    df_segmented['commit_driving_cat'].loc[df_segmented['commit_driving_cat'] == 3] = '20-40 mins driving'
+    df_segmented['commit_driving_cat'].loc[df_segmented['commit_driving_cat'] == 4] = '<20 mins driving'
+
+    df_segmented['commit_transit_cat'].loc[df_segmented['commit_transit_cat'] == 1] = '>1.5h transit'
+    df_segmented['commit_transit_cat'].loc[df_segmented['commit_transit_cat'] == 2] = '1-1.5h transit'
+    df_segmented['commit_transit_cat'].loc[df_segmented['commit_transit_cat'] == 3] = '40-60 mins transit'
+    df_segmented['commit_transit_cat'].loc[df_segmented['commit_transit_cat'] == 4] = '20-40 mins transit'
+    df_segmented['commit_transit_cat'].loc[df_segmented['commit_transit_cat'] == 5] = '<20 mins transit'
+
+    # define value for calculation distribution for each column
+    loc_types = ['City', 'Suburbs']
+    place_views = ['No view', 'Good view']
+    place_schools = ['Few sch', 'A few of sch', 'A lot of sch']
+    place_cafes = ['Few cafe', 'A few of cafe', 'A lot of cafe']
+    place_nightlife = ['Poor N_life', 'Good N_life', 'V Good N_life']
+    place_parks = ['None parks', 'A few of parks', 'A lot of parks']
+    place_driving = ['>1h driving', '40-60 mins driving', '20-40 mins driving', '<20 mins driving']
+    place_transit = ['>1.5h transit', '1-1.5h transit', '40-60 mins transit', '20-40 mins transit', '<20 mins transit']
+
+    df_profiling_cols = loc_types + place_views + place_schools + place_cafes + place_nightlife + place_parks + place_driving + place_transit
 
     # initiation of df_profiling
     n_columns = len(df_profiling_cols)
@@ -159,7 +253,29 @@ def _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters):
 
         for col in df_profiling_cols:
 
-            percent_val = round((len(df_cluster.loc[df_cluster[col] == 1]) / df_cluster_len) * 100)
+            # there are different columns in original df
+            # for different profiling columns
+            # for example: columnn prop_size in df_original
+            # transforms into three columns S, M, L in df_profiling
+            df_col_name = ''
+            if col in place_views:
+                df_col_name = 'loc_view'
+            elif col in loc_types:
+                df_col_name = 'cat_loc'
+            elif col in place_schools:
+                df_col_name = 'school_cat'
+            elif col in place_cafes:
+                df_col_name = 'cafe_rest_cat'
+            elif col in place_nightlife:
+                df_col_name = 'nightlife_cat'
+            elif col in place_parks:
+                df_col_name = 'park_cat'
+            elif col in place_driving:
+                df_col_name = 'commit_driving_cat'
+            elif col in place_transit:
+                df_col_name = 'commit_transit_cat'
+
+            percent_val = round((len(df_cluster.loc[df_cluster[df_col_name] == col]) / df_cluster_len) * 100)
             df_profiling.loc[cluster, col] = percent_val
 
     # add distribution values for each cluster

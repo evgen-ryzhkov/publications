@@ -9,6 +9,9 @@ from .k_means_segmentation import get_number_of_segments, get_segments, validate
 def get_price_segments(df_original):
     df_price_data = df_original[['fin_price', 'fin_price_per_m']].copy()
     df_preprocessed = _preprocess_data(df_price_data)
+    print(df_price_data)
+
+
 
     # to define number of cluster, run this function
     # get_number_of_segments(df_preprocessed)
