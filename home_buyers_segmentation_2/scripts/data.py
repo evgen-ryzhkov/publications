@@ -131,7 +131,7 @@ class Data:
     @staticmethod
     def _load_csv_data():
         print('[INFO] Parsing started...')
-        DATA_DIR = 'data/'
+        DATA_DIR = 'data/real_estate/'
 
         # csv files with city data consist of many separate files
         all_files = glob.glob(os.path.join(DATA_DIR + "/*.csv"))

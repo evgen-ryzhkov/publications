@@ -13,7 +13,13 @@ def get_place_segments(df_original):
 
     df_place_data = df_original[['city', 'neighborhood', 'location']].copy()
 
-    # df_preprocessed = _preprocess_data(df_place_data)
+    # more detailed data about neighborhoods
+    neighborhood_csv_path = 'data/neighborhoods/data.csv'
+    df_neighborhood = _load_csv_file(neighborhood_csv_path)
+
+    df_place_merged = pd.merge(df_place_data, df_neighborhood, how='left', left_on=['city', 'neighborhood'], right_on=['city', 'neighborhood'])
+
+    df_preprocessed = _preprocess_data(df_place_merged)
 
     # to define number of cluster, run this function
     # get_number_of_segments(df_preprocessed)
@@ -28,9 +34,9 @@ def get_place_segments(df_original):
 def _preprocess_data(df):
     print('[INFO] Place data preprocessing started...')
 
-    _create_neighborhood_csv(df)
-    exit()
-    # df_custom_features = _create_custom_features(df)
+    df_numeric = _convert_text_data(df)
+
+    df_custom_features = _create_custom_features(df)
 
     # choosing meaningful features for segmentation
     '''
@@ -45,90 +51,44 @@ def _preprocess_data(df):
     return df_for_segmentation
 
 
+def _convert_text_data(df):
+    count = 0
+    df['commit_time_driving_mins'] = ''
+    # convert commit time from hours & minutes format into minutes only
+    for index, row in df.iterrows():
+        count +=1
+        hours_exist = False
+        s = row['commit_time_driving']
+        sub_hours = 'hour'
+        sub_mins = 'mins'
 
+        # not all rows contain hours
+        try:
+            hours = s[:s.index(sub_hours)]
+            hours_exist = True
+        except:
+            hours = '0'
 
+        # not all rows contain mins
+        try:
+            if hours_exist:
+                mins = s[(s.index(sub_hours) + len(sub_hours)):s.index(sub_mins)]
+            else:
+                # if there isn't hours part, we get mins in another way
+                mins = s[:s.index(sub_mins)]
+        except:
+            mins = '0'
 
+        try:
+            df.loc[index, 'commit_time_driving_mins'] = int(hours.replace(' ', '')) * 60 + int(re.sub('[s ]', '', mins))
+        except:
+            print('hours=', hours)
+            print('mins=', mins)
 
-def _fill_neighborhood_csv(df):
-    DISTANCE_API_URL = 'https://maps.googleapis.com/maps/api/distancematrix/json?'
-    PLACE_API_URL = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json?'
-    GEOCODING_API_URL = 'https://maps.googleapis.com/maps/api/geocode/json?'
+    print(df)
 
-    COUNTRY = ',Netherlands'
-    DESTINATION = 'Amsterdam+Centraal+railway+station,+Stationsplein,+1012+AB+Amsterdam,+Netherlands'
-    API_KEY_S = '@key=' + API_KEY
+    return df
 
-    # TODO как минимум в субрбах, не для всех нейбрхудов находится геолокацияя. надо думать как определять такие ситуации, и тогда ограничивться только городом
-    DEBUG_CITY = 'Purmerend'
-    DEBUG_NEIGHBORHOOD = 'Stationsbuurt'
-
-    DEBUG_CITY_ESC = re.sub('[()]', '', DEBUG_CITY)
-    DEBUG_NEIGHBORHOOD_ESC = re.sub('[()]', '', DEBUG_NEIGHBORHOOD)
-    DEBUG_CITY_SPACE_REMOVED = DEBUG_CITY_ESC.replace(' ', '+')
-    DEBUG_NEIGHBORHOOD_REMOVED = DEBUG_NEIGHBORHOOD_ESC.replace(' ', '+')
-
-    ORIGINS = DEBUG_CITY_SPACE_REMOVED + DEBUG_NEIGHBORHOOD_REMOVED + COUNTRY
-
-    # get distance -----------------
-    params_driving = {
-        'language': 'en-EN',
-        'mode': 'driving',
-        'key': API_KEY,
-        'destinations': DESTINATION,
-        'origins': ORIGINS
-    }
-    # response = requests.get(DISTANCE_API_URL, params=params_driving)
-    # response.raise_for_status()
-    # response_json = response.json()
-    # df_neigborhoods.at[df_neigborhoods.index[0], 'commit_time_driving'] = \
-    # response_json['rows'][0]['elements'][0]['duration']['text']
-    #
-    # params_transit = {
-    #     'language': 'en-EN',
-    #     'mode': 'transit',
-    #     'key': API_KEY,
-    #     'destinations': DESTINATION,
-    #     'origins': ORIGINS
-    # }
-    # response = requests.get(DISTANCE_API_URL, params = params_transit)
-    # response.raise_for_status()
-    # response_json = response.json()
-    # df_neigborhoods.at[df_neigborhoods.index[0], 'commit_time_transit']= response_json['rows'][0]['elements'][0]['duration']['text']
-
-    # get geo location
-    # it needs for getting place info
-    params_geocoding = {
-        'key': API_KEY,
-        'address': ORIGINS
-    }
-    response = requests.get(GEOCODING_API_URL, params=params_geocoding)
-    response.raise_for_status()
-    response_json = response.json()
-    lat = response_json['results'][0]['geometry']['location']['lat']
-    lng = response_json['results'][0]['geometry']['location']['lng']
-    print(lat)
-    print(lng)
-
-    # get place info ----------------
-    params_primary_school = {
-        'language': 'en-EN',
-        'key': API_KEY,
-        'type': 'school',
-        'location': str(lat) + ',' + str(lng),
-        # 'location': '52.2713204,4.4409716',
-        'radius': 2000
-    }
-    response = requests.get(PLACE_API_URL, params=params_primary_school)
-    response.raise_for_status()
-    response_json = response.json()
-    print(len(response_json['results']))
-
-    # print(df_neigborhoods)
-
-    # for index, row in df.iterrows():
-    #     print(row['city'], row['neighborhood'])
-
-    # print(response_json)
 
 def _create_custom_features(df):
     # in the city or suburbs
@@ -210,3 +170,13 @@ def _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters):
 
     sns.heatmap(df_profiling, annot=True, fmt="g")
     plt.show()
+
+
+def _load_csv_file(file_path):
+    try:
+        df = pd.read_csv(file_path, index_col=None, header=0)
+        return df
+    except FileNotFoundError:
+        raise ValueError('[ERROR] CSV file not found!')
+    except:
+        raise ValueError('[ERROR] Something wrong with loading of CSV file!')
