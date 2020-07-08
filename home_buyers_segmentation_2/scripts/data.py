@@ -13,11 +13,11 @@ Written by Evgeniy Ryzhkov
 
 Usage:
 
-    # parse data
+    # start overall segmentation
     parse data: python -m scripts.data.py
 
 """
-from .k_means_segmentation import get_number_of_segments, get_segments
+from .k_means_segmentation import get_number_of_segments, get_segments, validate_cluster_sizes
 from .segments_analysis import analyse_segments
 from .object_segmentation import get_object_segments
 from .price_segmentation import get_price_segments
@@ -29,8 +29,7 @@ import pandas as pd
 import glob
 from sklearn.preprocessing import MinMaxScaler
 import matplotlib.pyplot as plt
-import random
-import re
+import seaborn as sns
 
 
 class Data:
@@ -45,6 +44,7 @@ class Data:
 
         print('[INFO] Object segmentation --------------------------')
         df_object_segments = get_object_segments(df_original_cleaned)
+        exit()
         print('[INFO] Price segmentation ---------------------------')
         df_price_segments = get_price_segments(df_original_cleaned)
         print('[INFO] Place segmentation ---------------------------')
@@ -53,28 +53,18 @@ class Data:
         df_merged = pd.concat([df_object_segments, df_price_segments, df_place_segments], axis=1)
         df_preprocessed = self._preprocess_data(df_merged)
 
-        # self._familiarity_with_data(df_original_cleaned)
+        # to define number of cluster, run this function
+        # get_number_of_segments(df_preprocessed)
+        num_clusters = 6
+        overall_cluster_column_name = 'cluster_overall'
+        df_original_overall_segmented = get_segments(df_merged, df_preprocessed, overall_cluster_column_name,
+                                                  num_clusters)
+        f_validation, df_stat = validate_cluster_sizes(df_original_overall_segmented, overall_cluster_column_name)
 
-        # df_city_loaded = self._get_test_data()
-
-
-
-        # 1. get property segments
-        # - 1.1. data preprocessing
-        # - 1.2. property segmentation
-        # - 1.3. get property segmented df
-        # 2. get price segments
-        # - 2.1. data preprocessing
-        # - 2.2. price segmentation
-        # - 2.3. get price segmented df
-        # 3. get place segments
-        # 4. get overall segments
-        # 4.1. merge part segmentation
-        # 4.2. overall segmentation
+        self._profile_clusters(df_original_overall_segmented, df_stat, overall_cluster_column_name, num_clusters)
 
     @staticmethod
     def _load_csv_data():
-        print('[INFO] Parsing started...')
         DATA_DIR = 'data/real_estate/'
 
         # csv files with city data consist of many separate files
@@ -141,6 +131,87 @@ class Data:
 
         return df_normalized
 
+    @staticmethod
+    def _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters):
+
+        # define value for calculation distribution for each column
+        ob_types = ['Flat', 'House', 'Townhouse']
+        ob_storages = ['No storage', 'S Storage', 'M Storage', 'B Storage']
+        # ob_energies = ['Good EE', 'Normal EE', 'Poor EE']
+        ob_gardens = ['No Garden', 'S Garden', 'M Garden', 'B Garden']
+        ob_cars = ['Poor CF', 'Usual CF', 'Good CF', 'VGood CF']
+        loc_types = ['City', 'Suburbs']
+        place_views = ['No view', 'Good view']
+        place_schools = ['Few sch', 'A few of sch', 'A lot of sch']
+        place_cafes = ['Few cafe', 'A few of cafe', 'A lot of cafe']
+        place_nightlife = ['Poor N_life', 'Good N_life', 'V Good N_life']
+        # place_parks = ['None parks', 'A few of parks', 'A lot of parks']
+        place_driving = ['>1h driving', '40-60 mins driving', '20-40 mins driving', '<20 mins driving']
+        df_profiling_cols = ob_types + ob_storages + ob_gardens + ob_cars + loc_types + place_views +\
+                            place_schools + place_cafes + place_nightlife + place_driving
+
+        # initiation of df_profiling
+        n_columns = len(df_profiling_cols)
+        init_array = np.zeros((n_clusters, n_columns))
+        df_profiling = pd.DataFrame(data=init_array, columns=df_profiling_cols)
+
+        # fill df_profiling with real values
+        # value - percents each type of features in cluster
+        for cluster in range(n_clusters):
+            df_cluster = df_segmented.loc[df_segmented[cluster_col_name] == cluster]
+            df_cluster_len = len(df_cluster)
+
+            for col in df_profiling_cols:
+
+                # there are different columns in original df
+                # for different profiling columns
+                # for example: columnn prop_size in df_original
+                # transforms into three columns S, M, L in df_profiling
+                df_col_name = ''
+                if col in ob_types:
+                    df_col_name = 'cat_ob_type'
+                elif col in ob_storages:
+                    df_col_name = 'cat_storage'
+                elif col in ob_gardens:
+                    df_col_name = 'cat_garden'
+                elif col in ob_cars:
+                    df_col_name = 'cat_car_friendly'
+                elif col in place_views:
+                    df_col_name = 'loc_view'
+                elif col in loc_types:
+                    df_col_name = 'cat_loc'
+                elif col in place_schools:
+                    df_col_name = 'school_cat'
+                elif col in place_cafes:
+                    df_col_name = 'cafe_rest_cat'
+                elif col in place_nightlife:
+                    df_col_name = 'nightlife_cat'
+                elif col in place_driving:
+                    df_col_name = 'commit_driving_cat'
+
+                percent_val = round((len(df_cluster.loc[df_cluster[df_col_name] == col]) / df_cluster_len) * 100)
+                df_profiling.loc[cluster, col] = percent_val
+
+        # mean columns
+        df_means = round(
+            df_segmented.groupby(cluster_col_name)['cat_living_area', 'ob_bedrooms', 'fin_price'].mean())
+
+        # add distribution values for each cluster
+        df_profiling = pd.concat([df_stat, df_profiling, df_means], axis=1, sort=False)
+
+        mng = plt.get_current_fig_manager()
+        mng.window.state('zoomed')  # full screen mode
+
+        # exclude some columns (like means) from heatmap
+        mask = np.zeros(df_profiling.shape)
+        mask[:, [33, 34, 35]] = True
+        cm = sns.light_palette("green")
+
+        sns.heatmap(df_profiling, mask=mask, annot=True, fmt="g", cmap=cm, square=True, xticklabels=True)
+        sns.heatmap(df_profiling, alpha=0, cbar=False, annot=True, fmt="g", square=True, xticklabels=True, annot_kws={"color": "black"})
+
+        # sns.heatmap(df_profiling, annot=True, fmt="g", square=True, xticklabels=True)
+        plt.show()
 
 
 # ----------------------------------------------------

@@ -20,7 +20,7 @@ def get_object_segments(df_original):
     df_original_prop_segmented = get_segments(df_object_data, df_preprocessed, object_cluster_column_name, num_clusters)
     f_validation, df_stat = validate_cluster_sizes(df_original_prop_segmented, object_cluster_column_name)
 
-    # _profile_clusters(df_original_prop_segmented, df_stat, object_cluster_column_name, num_clusters)
+    _profile_clusters(df_original_prop_segmented, df_stat, object_cluster_column_name, num_clusters)
     df_object_clusters = _prepare_for_overall_clustering(df_original_prop_segmented)
 
     return df_object_clusters
@@ -44,8 +44,14 @@ def _preprocess_data(df):
         - ? energy - personal beliefs (environment friendly)
         - ? living area - personal space
     '''
-    df_for_segmentation = df_na_filled[['ob_bedrooms', 'cat_energy', 'cat_storage', 'cat_garden',
-                                        'cat_living_area', 'cat_car_friendly']]
+    # total_num = len(df_na_filled)
+    # ob_types_arr = df_na_filled['cat_ob_type'].unique()
+    # for obj in ob_types_arr:
+    #     obj_num = len(df_na_filled.loc[df_na_filled['cat_ob_type'] == obj])
+    #     obj_distribution = round((obj_num / total_num) * 100)
+    #     print(obj + ' = ' + str(obj_distribution) + '%')
+    # exit()
+    df_for_segmentation = df_na_filled[['ob_bedrooms', 'cat_storage', 'cat_garden', 'cat_living_area', 'cat_car_friendly']]
     # ? df_optimized = _optimize_memory_usage(df_numeric)
 
     # encode property types
@@ -63,7 +69,7 @@ def _preprocess_data(df):
         [df_prop_type_1hot.reset_index(drop=True), df_for_segmentation.reset_index(drop=True)],
         axis=1, sort=False)
 
-    df_scaled = _scale_data(df_encode_merged, ['ob_bedrooms', 'cat_energy', 'cat_storage', 'cat_garden',
+    df_scaled = _scale_data(df_encode_merged, ['ob_bedrooms', 'cat_storage', 'cat_garden',
                                                'cat_living_area', 'cat_car_friendly'])
 
     print('[OK] Data preprocessing finished.')
@@ -85,7 +91,7 @@ def _fill_missed_values(df):
     df['cat_ob_type'] = df['cat_ob_type'].fillna('Flat')
 
     # for part of data just insert median value
-    median_columns = ['ob_living_area', 'cat_energy', 'ob_bedrooms', 'ob_vol_cub']
+    median_columns = ['ob_living_area', 'ob_bedrooms', 'ob_vol_cub']
     for col in median_columns:
         df[col] = round(df[col].fillna(df[col].median()))
 
@@ -132,9 +138,9 @@ def _create_custom_features(df):
     df.loc[df['ob_ext_storage'] > 14, 'cat_storage'] = 4
 
     # Energy efficiency ---------------------
-    df.loc[df['ob_energy'].str.contains(pat='A|B', na=False), 'cat_energy'] = 3  # Good Energy Efficiency
-    df.loc[df['ob_energy'].str.contains(pat='C|D', na=False), 'cat_energy'] = 2  # Normal Energy Efficiency
-    df.loc[df['ob_energy'].str.contains(pat='E|F|G', na=False), 'cat_energy'] = 1  # Poor Energy Efficiency
+    # df.loc[df['ob_energy'].str.contains(pat='A|B', na=False), 'cat_energy'] = 3  # Good Energy Efficiency
+    # df.loc[df['ob_energy'].str.contains(pat='C|D', na=False), 'cat_energy'] = 2  # Normal Energy Efficiency
+    # df.loc[df['ob_energy'].str.contains(pat='E|F|G', na=False), 'cat_energy'] = 1  # Poor Energy Efficiency
 
     # Car Friendly Category -----------------
     # 1 - Poor CF (NaN / No Place for Car / Paid Parking / resident's parking permits)
@@ -190,9 +196,9 @@ def _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters):
     df_segmented['cat_storage'].loc[df_segmented['cat_storage'] == 3] = 'M Storage'
     df_segmented['cat_storage'].loc[df_segmented['cat_storage'] == 4] = 'B Storage'
 
-    df_segmented['cat_energy'].loc[df_segmented['cat_energy'] == 3] = 'Good EE'
-    df_segmented['cat_energy'].loc[df_segmented['cat_energy'] == 2] = 'Normal EE'
-    df_segmented['cat_energy'].loc[df_segmented['cat_energy'] == 1] = 'Poor EE'
+    # df_segmented['cat_energy'].loc[df_segmented['cat_energy'] == 3] = 'Good EE'
+    # df_segmented['cat_energy'].loc[df_segmented['cat_energy'] == 2] = 'Normal EE'
+    # df_segmented['cat_energy'].loc[df_segmented['cat_energy'] == 1] = 'Poor EE'
 
     df_segmented['cat_garden'].loc[df_segmented['cat_garden'] == 1] = 'No Garden'
     df_segmented['cat_garden'].loc[df_segmented['cat_garden'] == 2] = 'S Garden'
@@ -208,10 +214,10 @@ def _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters):
     # define value for calculation distribution for each column
     ob_types = ['Flat', 'House', 'Townhouse']
     ob_storages = ['No storage', 'S Storage', 'M Storage', 'B Storage']
-    ob_energies = ['Good EE', 'Normal EE', 'Poor EE']
+    # ob_energies = ['Good EE', 'Normal EE', 'Poor EE']
     ob_gardens = ['No Garden', 'S Garden', 'M Garden', 'B Garden']
     ob_cars = ['Poor CF', 'Usual CF', 'Good CF', 'VGood CF']
-    df_profiling_cols = ob_types + ob_storages + ob_energies + ob_gardens + ob_cars
+    df_profiling_cols = ob_types + ob_storages + ob_gardens + ob_cars
 
     # initiation of df_profiling
     n_columns = len(df_profiling_cols)
@@ -235,8 +241,6 @@ def _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters):
                 df_col_name = 'cat_ob_type'
             elif col in ob_storages:
                 df_col_name = 'cat_storage'
-            elif col in ob_energies:
-                df_col_name = 'cat_energy'
             elif col in ob_gardens:
                 df_col_name = 'cat_garden'
             elif col in ob_cars:
@@ -266,7 +270,7 @@ def _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters):
 
     # exclude some columns (like means) from heatmap
     mask = np.zeros(df_profiling.shape)
-    mask[:, [19, 20, 21]] = True
+    mask[:, [16, 17, 18]] = True
 
     cm = sns.light_palette("green")
 
@@ -289,23 +293,23 @@ def _prepare_for_overall_clustering(df):
 
     # choose object features for common profiling
     df_prepared = df[['cluster_object', 'cat_ob_type', 'ob_bedrooms', 'cat_living_area', 'ob_vol_cub',
-                      'cat_storage', 'cat_energy', 'cat_car_friendly', 'cat_garden']].copy()
+                      'cat_storage', 'cat_car_friendly', 'cat_garden']].copy()
 
     # transform some number value into readable
     # TODO there is duplicate code here
-    df_prepared['cat_living_area'].loc[df_prepared['cat_living_area'] == 1] = '>100 m2'
-    df_prepared['cat_living_area'].loc[df_prepared['cat_living_area'] == 2] = '100-150m2'
-    df_prepared['cat_living_area'].loc[df_prepared['cat_living_area'] == 3] = '151-250m2'
-    df_prepared['cat_living_area'].loc[df_prepared['cat_living_area'] == 4] = '250m2 +'
+    # df_prepared['cat_living_area'].loc[df_prepared['cat_living_area'] == 1] = '>100 m2'
+    # df_prepared['cat_living_area'].loc[df_prepared['cat_living_area'] == 2] = '100-150m2'
+    # df_prepared['cat_living_area'].loc[df_prepared['cat_living_area'] == 3] = '151-250m2'
+    # df_prepared['cat_living_area'].loc[df_prepared['cat_living_area'] == 4] = '250m2 +'
 
     df_prepared['cat_storage'].loc[df_prepared['cat_storage'] == 1] = 'No storage'
     df_prepared['cat_storage'].loc[df_prepared['cat_storage'] == 2] = 'S Storage'
     df_prepared['cat_storage'].loc[df_prepared['cat_storage'] == 3] = 'M Storage'
     df_prepared['cat_storage'].loc[df_prepared['cat_storage'] == 4] = 'B Storage'
 
-    df_prepared['cat_energy'].loc[df_prepared['cat_energy'] == 3] = 'Good EE'
-    df_prepared['cat_energy'].loc[df_prepared['cat_energy'] == 2] = 'Normal EE'
-    df_prepared['cat_energy'].loc[df_prepared['cat_energy'] == 1] = 'Poor EE'
+    # df_prepared['cat_energy'].loc[df_prepared['cat_energy'] == 3] = 'Good EE'
+    # df_prepared['cat_energy'].loc[df_prepared['cat_energy'] == 2] = 'Normal EE'
+    # df_prepared['cat_energy'].loc[df_prepared['cat_energy'] == 1] = 'Poor EE'
 
     df_prepared['cat_garden'].loc[df_prepared['cat_garden'] == 1] = 'No Garden'
     df_prepared['cat_garden'].loc[df_prepared['cat_garden'] == 2] = 'S Garden'

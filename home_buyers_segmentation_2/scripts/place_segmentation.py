@@ -54,7 +54,7 @@ def _preprocess_data(df):
         - commit driving time - how far from Amsterdam's center
     '''
     df_for_segmentation = df_filled_nan[['loc_view', 'school_cat', 'cafe_rest_cat',
-                                         'nightlife_cat', 'park_cat', 'commit_driving_cat']]
+                                         'nightlife_cat', 'commit_driving_cat']]
 
     # encode property types
     encoder_1hot = OneHotEncoder()
@@ -71,8 +71,7 @@ def _preprocess_data(df):
         [df_loc_type_1hot.reset_index(drop=True), df_for_segmentation.reset_index(drop=True)],
         axis=1, sort=False)
 
-    df_scaled = _scale_data(df_encode_merged, ['school_cat', 'cafe_rest_cat', 'nightlife_cat', 'park_cat',
-                                                  'commit_driving_cat'])
+    df_scaled = _scale_data(df_encode_merged, ['school_cat', 'cafe_rest_cat', 'nightlife_cat', 'commit_driving_cat'])
 
     print('[OK] Data preprocessing finished.')
     return df_scaled
@@ -209,9 +208,9 @@ def _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters):
     df_segmented['nightlife_cat'].loc[df_segmented['nightlife_cat'] == 2] = 'Good N_life'
     df_segmented['nightlife_cat'].loc[df_segmented['nightlife_cat'] == 3] = 'V Good N_life'
 
-    df_segmented['park_cat'].loc[df_segmented['park_cat'] == 1] = 'None parks'
-    df_segmented['park_cat'].loc[df_segmented['park_cat'] == 2] = 'A few of parks'
-    df_segmented['park_cat'].loc[df_segmented['park_cat'] == 3] = 'A lot of parks'
+    # df_segmented['park_cat'].loc[df_segmented['park_cat'] == 1] = 'None parks'
+    # df_segmented['park_cat'].loc[df_segmented['park_cat'] == 2] = 'A few of parks'
+    # df_segmented['park_cat'].loc[df_segmented['park_cat'] == 3] = 'A lot of parks'
 
     df_segmented['commit_driving_cat'].loc[df_segmented['commit_driving_cat'] == 1] = '>1h driving'
     df_segmented['commit_driving_cat'].loc[df_segmented['commit_driving_cat'] == 2] = '40-60 mins driving'
@@ -224,10 +223,10 @@ def _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters):
     place_schools = ['Few sch', 'A few of sch', 'A lot of sch']
     place_cafes = ['Few cafe', 'A few of cafe', 'A lot of cafe']
     place_nightlife = ['Poor N_life', 'Good N_life', 'V Good N_life']
-    place_parks = ['None parks', 'A few of parks', 'A lot of parks']
+    # place_parks = ['None parks', 'A few of parks', 'A lot of parks']
     place_driving = ['>1h driving', '40-60 mins driving', '20-40 mins driving', '<20 mins driving']
 
-    df_profiling_cols = loc_types + place_views + place_schools + place_cafes + place_nightlife + place_parks + place_driving
+    df_profiling_cols = loc_types + place_views + place_schools + place_cafes + place_nightlife + place_driving
 
     # initiation of df_profiling
     n_columns = len(df_profiling_cols)
@@ -257,8 +256,6 @@ def _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters):
                 df_col_name = 'cafe_rest_cat'
             elif col in place_nightlife:
                 df_col_name = 'nightlife_cat'
-            elif col in place_parks:
-                df_col_name = 'park_cat'
             elif col in place_driving:
                 df_col_name = 'commit_driving_cat'
 
@@ -279,7 +276,7 @@ def _prepare_for_overall_clustering(df):
 
     # choose object features for common profiling
     df_prepared = df[['cluster_place', 'cat_loc', 'loc_view', 'school_cat', 'cafe_rest_cat', 'nightlife_cat',
-                      'park_cat', 'commit_driving_cat']].copy()
+                      'commit_driving_cat']].copy()
 
     # replace categorical numbers by readable values
     # TODO there is duplicate code here
@@ -298,9 +295,9 @@ def _prepare_for_overall_clustering(df):
     df_prepared['nightlife_cat'].loc[df_prepared['nightlife_cat'] == 2] = 'Good N_life'
     df_prepared['nightlife_cat'].loc[df_prepared['nightlife_cat'] == 3] = 'V Good N_life'
 
-    df_prepared['park_cat'].loc[df_prepared['park_cat'] == 1] = 'None parks'
-    df_prepared['park_cat'].loc[df_prepared['park_cat'] == 2] = 'A few of parks'
-    df_prepared['park_cat'].loc[df_prepared['park_cat'] == 3] = 'A lot of parks'
+    # df_prepared['park_cat'].loc[df_prepared['park_cat'] == 1] = 'None parks'
+    # df_prepared['park_cat'].loc[df_prepared['park_cat'] == 2] = 'A few of parks'
+    # df_prepared['park_cat'].loc[df_prepared['park_cat'] == 3] = 'A lot of parks'
 
     df_prepared['commit_driving_cat'].loc[df_prepared['commit_driving_cat'] == 1] = '>1h driving'
     df_prepared['commit_driving_cat'].loc[df_prepared['commit_driving_cat'] == 2] = '40-60 mins driving'
