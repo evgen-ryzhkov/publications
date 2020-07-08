@@ -9,9 +9,6 @@ from .k_means_segmentation import get_number_of_segments, get_segments, validate
 def get_price_segments(df_original):
     df_price_data = df_original[['fin_price', 'fin_price_per_m']].copy()
     df_preprocessed = _preprocess_data(df_price_data)
-    print(df_price_data)
-
-
 
     # to define number of cluster, run this function
     # get_number_of_segments(df_preprocessed)
@@ -27,7 +24,7 @@ def get_price_segments(df_original):
 
 
 def _preprocess_data(df):
-    print('[INFO] Object data preprocessing started...')
+    print('[INFO] Data preprocessing started...')
     df_numeric = _convert_text_data(df)
     df_na_filled = _fill_missed_values(df_numeric)
     df_custom_features = _create_custom_features(df_na_filled)
@@ -40,7 +37,7 @@ def _preprocess_data(df):
     df_for_segmentation = df_custom_features[['fin_price']]
     df_scaled = _scale_data(df_for_segmentation, ['fin_price'])
 
-    print('[OK] Price data preprocessing finished.')
+    print('[OK] Data preprocessing finished.')
 
     return df_scaled
 

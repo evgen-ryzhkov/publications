@@ -43,15 +43,25 @@ class Data:
         # general data cleaning
         df_original_cleaned = self._clean_data(df_city_loaded)
 
-        # df_object_segments = get_object_segments(df_original_cleaned)
-        # df_price_segments = get_price_segments(df_original_cleaned)
-
+        print('[INFO] Object segmentation --------------------------')
+        df_object_segments = get_object_segments(df_original_cleaned)
+        print('[INFO] Price segmentation ---------------------------')
+        df_price_segments = get_price_segments(df_original_cleaned)
+        print('[INFO] Place segmentation ---------------------------')
         df_place_segments = get_place_segments(df_original_cleaned)
+
+        print(df_object_segments)
+        print(df_price_segments)
+        print(df_place_segments)
+
+        df_merged = pd.concat([df_object_segments, df_price_segments, df_place_segments], axis=1)
+        print(df_merged)
+
 
         # self._familiarity_with_data(df_original_cleaned)
 
         # df_city_loaded = self._get_test_data()
-        df_original = df_city_loaded
+
 
 
         # 1. get property segments

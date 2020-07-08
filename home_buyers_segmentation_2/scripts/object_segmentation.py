@@ -7,7 +7,6 @@ from .k_means_segmentation import get_number_of_segments, get_segments, validate
 
 
 def get_object_segments(df_original):
-    # print(df_original.info())
     df_object_data = df_original[['ob_kind', 'ob_year', 'ob_specific', 'ob_living_area', 'ob_other_space_inside',
                                   'ob_ext_storage', 'ob_vol_cub', 'ob_room_num', 'ob_bath_num', 'ob_bath_facilities',
                                   'ob_stories', 'ob_facilities', 'ob_energy', 'ob_insulation', 'shed_storage',
@@ -21,7 +20,7 @@ def get_object_segments(df_original):
     df_original_prop_segmented = get_segments(df_object_data, df_preprocessed, object_cluster_column_name, num_clusters)
     f_validation, df_stat = validate_cluster_sizes(df_original_prop_segmented, object_cluster_column_name)
 
-    _profile_clusters(df_original_prop_segmented, df_stat, object_cluster_column_name, num_clusters)
+    # _profile_clusters(df_original_prop_segmented, df_stat, object_cluster_column_name, num_clusters)
     df_object_clusters = _prepare_for_overall_clustering(df_original_prop_segmented)
 
     return df_object_clusters
@@ -29,7 +28,7 @@ def get_object_segments(df_original):
 
 def _preprocess_data(df):
 
-    print('[INFO] Object data preprocessing started...')
+    print('[INFO] Data preprocessing started...')
 
     df_numeric = _convert_text_data(df)
     df_custom_features = _create_custom_features(df_numeric)
@@ -67,7 +66,7 @@ def _preprocess_data(df):
     df_scaled = _scale_data(df_encode_merged, ['ob_bedrooms', 'cat_energy', 'cat_storage', 'cat_garden',
                                                'cat_living_area', 'cat_car_friendly'])
 
-    print('[OK] Object data preprocessing finished.')
+    print('[OK] Data preprocessing finished.')
 
     return df_scaled
 
@@ -283,17 +282,39 @@ def _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters):
 
     print(df_profiling.sort_values('Cluster %', ascending=False))
 
+    return df_profiling
+
 
 def _prepare_for_overall_clustering(df):
 
     # choose object features for common profiling
-    df_prepared = df[['cluster_object', 'cat_ob_type', 'ob_bedrooms', 'ob_living_area', 'cat_living_area', 'ob_vol_cub',
+    df_prepared = df[['cluster_object', 'cat_ob_type', 'ob_bedrooms', 'cat_living_area', 'ob_vol_cub',
                       'cat_storage', 'cat_energy', 'cat_car_friendly', 'cat_garden']].copy()
 
     # transform some number value into readable
+    # TODO there is duplicate code here
     df_prepared['cat_living_area'].loc[df_prepared['cat_living_area'] == 1] = '>100 m2'
     df_prepared['cat_living_area'].loc[df_prepared['cat_living_area'] == 2] = '100-150m2'
     df_prepared['cat_living_area'].loc[df_prepared['cat_living_area'] == 3] = '151-250m2'
     df_prepared['cat_living_area'].loc[df_prepared['cat_living_area'] == 4] = '250m2 +'
+
+    df_prepared['cat_storage'].loc[df_prepared['cat_storage'] == 1] = 'No storage'
+    df_prepared['cat_storage'].loc[df_prepared['cat_storage'] == 2] = 'S Storage'
+    df_prepared['cat_storage'].loc[df_prepared['cat_storage'] == 3] = 'M Storage'
+    df_prepared['cat_storage'].loc[df_prepared['cat_storage'] == 4] = 'B Storage'
+
+    df_prepared['cat_energy'].loc[df_prepared['cat_energy'] == 3] = 'Good EE'
+    df_prepared['cat_energy'].loc[df_prepared['cat_energy'] == 2] = 'Normal EE'
+    df_prepared['cat_energy'].loc[df_prepared['cat_energy'] == 1] = 'Poor EE'
+
+    df_prepared['cat_garden'].loc[df_prepared['cat_garden'] == 1] = 'No Garden'
+    df_prepared['cat_garden'].loc[df_prepared['cat_garden'] == 2] = 'S Garden'
+    df_prepared['cat_garden'].loc[df_prepared['cat_garden'] == 3] = 'M Garden'
+    df_prepared['cat_garden'].loc[df_prepared['cat_garden'] == 4] = 'B Garden'
+
+    df_prepared['cat_car_friendly'].loc[df_prepared['cat_car_friendly'] == 1] = 'Poor CF'
+    df_prepared['cat_car_friendly'].loc[df_prepared['cat_car_friendly'] == 2] = 'Usual CF'
+    df_prepared['cat_car_friendly'].loc[df_prepared['cat_car_friendly'] == 3] = 'Good CF'
+    df_prepared['cat_car_friendly'].loc[df_prepared['cat_car_friendly'] == 4] = 'VGood CF'
 
     return df_prepared

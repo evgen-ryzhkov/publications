@@ -17,8 +17,8 @@ def get_place_segments(df_original):
     neighborhood_csv_path = 'data/neighborhoods/data.csv'
     df_neighborhood = _load_csv_file(neighborhood_csv_path)
 
-    df_place_merged = pd.merge(df_place_data, df_neighborhood, how='left', left_on=['city', 'neighborhood'],
-                               right_on=['city', 'neighborhood'])
+    df_place_merged = df_place_data.reset_index().merge(df_neighborhood, how="left", left_on=['city', 'neighborhood'],
+                                right_on=['city', 'neighborhood']).set_index('index')
 
     df_preprocessed = _preprocess_data(df_place_merged)
 
@@ -29,11 +29,15 @@ def get_place_segments(df_original):
     df_original_place_segmented = get_segments(df_place_merged, df_preprocessed, place_cluster_column_name, num_clusters)
     f_validation, df_stat = validate_cluster_sizes(df_original_place_segmented, place_cluster_column_name)
 
-    _profile_clusters(df_original_place_segmented, df_stat, place_cluster_column_name, num_clusters)
+    # uncomment for profiling
+    # _profile_clusters(df_original_place_segmented, df_stat, place_cluster_column_name, num_clusters)
+
+    df_place_clusters = _prepare_for_overall_clustering(df_original_place_segmented)
+    return df_place_clusters
 
 
 def _preprocess_data(df):
-    print('[INFO] Place data preprocessing started...')
+    print('[INFO] Data preprocessing started...')
 
     df_numeric = _convert_text_data(df)
 
@@ -43,13 +47,14 @@ def _preprocess_data(df):
     # choosing meaningful features for segmentation
     '''
         - cat_city/suburbs - different lifestyle
-        - loc_[different location attributes] - lifestyle
+        - school_cat (school numbers) - good for family
+        - cafe/restaraunts - lifestyle
+        - nightlife - lifestyle 
+        - park - family / dogs / outdoor activities
+        - commit driving time - how far from Amsterdam's center
     '''
-    # df_for_segmentation = df_custom_features[['cat_city', 'cat_suburbs', 'loc_quiet_road', 'loc_busy_road',
-    #                                           'loc_in_center', 'loc_res_district', 'loc_near_park',
-    #                                           'loc_near_forest', 'loc_near_water', 'loc_rural']]
     df_for_segmentation = df_filled_nan[['loc_view', 'school_cat', 'cafe_rest_cat',
-                                         'nightlife_cat', 'park_cat', 'commit_driving_cat', 'commit_transit_cat']]
+                                         'nightlife_cat', 'park_cat', 'commit_driving_cat']]
 
     # encode property types
     encoder_1hot = OneHotEncoder()
@@ -67,9 +72,9 @@ def _preprocess_data(df):
         axis=1, sort=False)
 
     df_scaled = _scale_data(df_encode_merged, ['school_cat', 'cafe_rest_cat', 'nightlife_cat', 'park_cat',
-                                                  'commit_driving_cat', 'commit_transit_cat'])
+                                                  'commit_driving_cat'])
 
-    print('[OK] Place data preprocessing finished.')
+    print('[OK] Data preprocessing finished.')
     return df_scaled
 
 
@@ -77,8 +82,10 @@ def _convert_text_data(df):
     print('[INFO] Converting commit driving time into minutes...')
     df_converted = _convert_commit_time(df, 'commit_time_driving')
 
-    print('[INFO] Converting commit transit time into minutes...')
-    df_converted = _convert_commit_time(df_converted, 'commit_time_transit')
+    # as I exclude transit time from segmentation features
+    # it's no need to spend time for converting
+    # print('[INFO] Converting commit transit time into minutes...')
+    # df_converted = _convert_commit_time(df_converted, 'commit_time_transit')
 
     return df_converted
 
@@ -129,8 +136,6 @@ def _create_custom_features(df):
     df.loc[df['city'] == 'Amsterdam', 'cat_loc'] = 'City'
     df.loc[df['city'] != 'Amsterdam', 'cat_loc'] = 'Suburbs'
 
-    # df.loc[df['location'].str.contains(pat='quiet road|rural', na=False, case=False), 'loc_quiet'] = 1
-    # df.loc[df['location'].str.contains(pat='in center|residential district', na=False, case=False), 'loc_walkability'] = 1
     df.loc[df['location'].str.contains(pat='alongside park|forest|wooded surroundings|water|waterway|seaview', na=False, case=False), 'loc_view'] = 1
 
     df.loc[df['school_num']<6, 'school_cat'] = 1
@@ -153,15 +158,6 @@ def _create_custom_features(df):
     df.loc[(df['commit_time_driving_mins']) < 60, 'commit_driving_cat'] = 2
     df.loc[(df['commit_time_driving_mins']) <= 40, 'commit_driving_cat'] = 3
     df.loc[(df['commit_time_driving_mins']) <= 20, 'commit_driving_cat'] = 4
-
-    # fixing some errors in values
-    df.loc[df['commit_time_transit_mins']== '', 'commit_time_transit_mins'] = df['commit_time_driving_mins']*2
-
-    df.loc[(df['commit_time_transit_mins']) >= 80, 'commit_transit_cat'] = 1
-    df.loc[(df['commit_time_transit_mins']) < 80, 'commit_transit_cat'] = 2
-    df.loc[(df['commit_time_transit_mins']) <= 60, 'commit_transit_cat'] = 3
-    df.loc[(df['commit_time_transit_mins']) <= 40, 'commit_transit_cat'] = 4
-    df.loc[(df['commit_time_transit_mins']) <= 20, 'commit_transit_cat'] = 5
 
     return df
 
@@ -222,12 +218,6 @@ def _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters):
     df_segmented['commit_driving_cat'].loc[df_segmented['commit_driving_cat'] == 3] = '20-40 mins driving'
     df_segmented['commit_driving_cat'].loc[df_segmented['commit_driving_cat'] == 4] = '<20 mins driving'
 
-    df_segmented['commit_transit_cat'].loc[df_segmented['commit_transit_cat'] == 1] = '>1.5h transit'
-    df_segmented['commit_transit_cat'].loc[df_segmented['commit_transit_cat'] == 2] = '1-1.5h transit'
-    df_segmented['commit_transit_cat'].loc[df_segmented['commit_transit_cat'] == 3] = '40-60 mins transit'
-    df_segmented['commit_transit_cat'].loc[df_segmented['commit_transit_cat'] == 4] = '20-40 mins transit'
-    df_segmented['commit_transit_cat'].loc[df_segmented['commit_transit_cat'] == 5] = '<20 mins transit'
-
     # define value for calculation distribution for each column
     loc_types = ['City', 'Suburbs']
     place_views = ['No view', 'Good view']
@@ -236,9 +226,8 @@ def _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters):
     place_nightlife = ['Poor N_life', 'Good N_life', 'V Good N_life']
     place_parks = ['None parks', 'A few of parks', 'A lot of parks']
     place_driving = ['>1h driving', '40-60 mins driving', '20-40 mins driving', '<20 mins driving']
-    place_transit = ['>1.5h transit', '1-1.5h transit', '40-60 mins transit', '20-40 mins transit', '<20 mins transit']
 
-    df_profiling_cols = loc_types + place_views + place_schools + place_cafes + place_nightlife + place_parks + place_driving + place_transit
+    df_profiling_cols = loc_types + place_views + place_schools + place_cafes + place_nightlife + place_parks + place_driving
 
     # initiation of df_profiling
     n_columns = len(df_profiling_cols)
@@ -272,8 +261,6 @@ def _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters):
                 df_col_name = 'park_cat'
             elif col in place_driving:
                 df_col_name = 'commit_driving_cat'
-            elif col in place_transit:
-                df_col_name = 'commit_transit_cat'
 
             percent_val = round((len(df_cluster.loc[df_cluster[df_col_name] == col]) / df_cluster_len) * 100)
             df_profiling.loc[cluster, col] = percent_val
@@ -286,6 +273,41 @@ def _profile_clusters(df_segmented, df_stat, cluster_col_name, n_clusters):
 
     sns.heatmap(df_profiling, annot=True, fmt="g")
     plt.show()
+
+
+def _prepare_for_overall_clustering(df):
+
+    # choose object features for common profiling
+    df_prepared = df[['cluster_place', 'cat_loc', 'loc_view', 'school_cat', 'cafe_rest_cat', 'nightlife_cat',
+                      'park_cat', 'commit_driving_cat']].copy()
+
+    # replace categorical numbers by readable values
+    # TODO there is duplicate code here
+    df_prepared['loc_view'].loc[df_prepared['loc_view'] == 0] = 'No view'
+    df_prepared['loc_view'].loc[df_prepared['loc_view'] == 1] = 'Good view'
+
+    df_prepared['school_cat'].loc[df_prepared['school_cat'] == 1] = 'Few sch'
+    df_prepared['school_cat'].loc[df_prepared['school_cat'] == 2] = 'A few of sch'
+    df_prepared['school_cat'].loc[df_prepared['school_cat'] == 3] = 'A lot of sch'
+
+    df_prepared['cafe_rest_cat'].loc[df_prepared['cafe_rest_cat'] == 1] = 'Few cafe'
+    df_prepared['cafe_rest_cat'].loc[df_prepared['cafe_rest_cat'] == 2] = 'A few of cafe'
+    df_prepared['cafe_rest_cat'].loc[df_prepared['cafe_rest_cat'] == 3] = 'A lot of cafe'
+
+    df_prepared['nightlife_cat'].loc[df_prepared['nightlife_cat'] == 1] = 'Poor N_life'
+    df_prepared['nightlife_cat'].loc[df_prepared['nightlife_cat'] == 2] = 'Good N_life'
+    df_prepared['nightlife_cat'].loc[df_prepared['nightlife_cat'] == 3] = 'V Good N_life'
+
+    df_prepared['park_cat'].loc[df_prepared['park_cat'] == 1] = 'None parks'
+    df_prepared['park_cat'].loc[df_prepared['park_cat'] == 2] = 'A few of parks'
+    df_prepared['park_cat'].loc[df_prepared['park_cat'] == 3] = 'A lot of parks'
+
+    df_prepared['commit_driving_cat'].loc[df_prepared['commit_driving_cat'] == 1] = '>1h driving'
+    df_prepared['commit_driving_cat'].loc[df_prepared['commit_driving_cat'] == 2] = '40-60 mins driving'
+    df_prepared['commit_driving_cat'].loc[df_prepared['commit_driving_cat'] == 3] = '20-40 mins driving'
+    df_prepared['commit_driving_cat'].loc[df_prepared['commit_driving_cat'] == 4] = '<20 mins driving'
+
+    return df_prepared
 
 
 def _load_csv_file(file_path):

@@ -54,7 +54,7 @@ def _get_clusters(df_normalized, num_clusters):
 def validate_cluster_sizes(df_segmented, cluster_col_name):
     print('[INFO] Segment sizes validation...')
     df_stat = round(((df_segmented.groupby(cluster_col_name).size())/len(df_segmented))*100).astype(int)
-    print('Cluster distribution, %\n', df_stat)
+    # print('Cluster distribution, %\n', df_stat)
 
     f_validation = True
     for i in range(len(df_stat)):
